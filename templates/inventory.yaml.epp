@@ -1,0 +1,6 @@
+<%- | String[1] $puppetserver_fqdn | -%>
+# Managed by stagehand::console — do not edit by hand.
+targets:
+  - name: <%= $puppetserver_fqdn %>
+    config:
+      transport: local

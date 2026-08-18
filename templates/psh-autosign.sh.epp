@@ -1,0 +1,15 @@
+<%- | String[1] $console_url | -%>
+#!/bin/sh
+# Managed by stagehand::console_integration — policy autosign hook
+# (docs/design/registration-contract.md §5). $1 = certname; the CSR PEM is on
+# stdin. Exit 0 = sign, non-zero = do NOT sign. Any failure (console down, no
+# challenge) exits 1 so the CSR safely waits for manual signing.
+CERT="$1"
+CH=$(openssl req -noout -text 2>/dev/null | sed -n 's/.*[Cc]hallenge[Pp]assword.*:[[:space:]]*//p' | head -1)
+[ -n "$CH" ] || exit 1
+case "$CERT" in
+  *[!A-Za-z0-9._-]*|"") exit 1 ;;
+esac
+CODE=$(curl -sS -o /dev/null -w '%{http_code}' "<%= $console_url %>/api/v1/autosign/$CH?certname=$CERT" 2>/dev/null) || exit 1
+[ "$CODE" = "200" ] && exit 0
+exit 1

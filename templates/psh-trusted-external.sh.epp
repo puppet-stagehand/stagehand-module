@@ -1,0 +1,27 @@
+<%- | String[1] $console_url, String[1] $client_yaml, String[1] $cache_dir | -%>
+#!/bin/sh
+# Managed by stagehand::console_integration — trusted_external_command 'psh'.
+# Emits trusted.external.psh.{data,groups,primary_group} by querying the
+# console's external-data API. Self-contained (curl only) — no console binary.
+# ALWAYS exits 0 with a JSON object; empty {} on any failure, since it sits in
+# the catalog hot path and must never break a compile.
+CERT="$1"
+CLIENT="<%= $client_yaml %>"
+CACHE_DIR="<%= $cache_dir %>"
+EMPTY='{"data":{},"groups":[],"primary_group":""}'
+case "$CERT" in
+  *[!A-Za-z0-9._-]*|"") printf '%s\n' "$EMPTY"; exit 0 ;;
+esac
+TOKEN=$(sed -n 's/^token:[[:space:]]*//p' "$CLIENT" 2>/dev/null | head -1 | tr -d '"')
+BODY=$(mktemp 2>/dev/null) || { printf '%s\n' "$EMPTY"; exit 0; }
+CODE=$(curl -sS -o "$BODY" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "<%= $console_url %>/api/v1/external-data/$CERT" 2>/dev/null) || CODE=000
+if [ "$CODE" = "200" ] && [ -s "$BODY" ]; then
+  cat "$BODY"
+  TMP=$(mktemp "$CACHE_DIR/.tmp.XXXXXX" 2>/dev/null) && cp "$BODY" "$TMP" && mv "$TMP" "$CACHE_DIR/$CERT.json"
+elif [ -f "$CACHE_DIR/$CERT.json" ]; then
+  cat "$CACHE_DIR/$CERT.json"
+else
+  printf '%s\n' "$EMPTY"
+fi
+rm -f "$BODY"
+exit 0

@@ -1,0 +1,4 @@
+{
+  "description": "Guarded re-certification: write csr_attributes.yaml (challenge + pp_* identity extension_requests), move the SSL dir aside (backup, never delete), re-run the agent. The console mints the single-use certname-bound autosign authorization FIRST — this task is the node-side half. Params (input_method environment, undeclared on purpose so pp_* extensions pass through): challenge=<one-time token>, ext_<pp_name>=<value> per identity extension (e.g. ext_pp_department=finance).",
+  "input_method": "environment"
+}

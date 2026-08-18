@@ -1,0 +1,11 @@
+{
+  "description": "Read-only RAL enumeration of a node's current package/user/group/service (default) and mount/cron (opt-in) state via `puppet resource <type> --to_yaml` (query form only, never a set-form invocation). User password hashes and cron command-line secrets are redacted before the result leaves the node. A single slow/failed type times out or errors independently of the others.",
+  "input_method": "environment",
+  "parameters": {
+    "types": {
+      "description": "Resource types to enumerate. Each is queried as `puppet resource <type> --to_yaml` — never a set form with a title or attr=value.",
+      "type": "Array[Enum[package, user, group, service, mount, cron]]",
+      "default": ["package", "user", "group", "service"]
+    }
+  }
+}

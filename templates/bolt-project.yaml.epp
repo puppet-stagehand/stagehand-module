@@ -1,0 +1,6 @@
+<%- | | -%>
+# Managed by stagehand::console — do not edit by hand.
+name: psh_runner
+modulepath:
+  - /opt/puppetlabs/puppet/modules
+  - modules

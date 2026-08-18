@@ -1,0 +1,41 @@
+{
+  "description": "Runs a pasted Ansible playbook against the node itself via `ansible-playbook --connection=local -i localhost,` (Bolt pushes this task, no separate Ansible control node). Installs Ansible first per install_method unless \"skip\". Rejects a playbook that does not declare both `hosts: localhost` and `connection: local` (defense-in-depth; the console API is authoritative).",
+  "input_method": "stdin",
+  "files": ["stagehand/tasks/install_ansible.sh"],
+  "parameters": {
+    "console_url": {
+      "description": "Console base URL (server-injected).",
+      "type": "String[1]"
+    },
+    "ingest_token": {
+      "description": "Bearer token (server-injected).",
+      "type": "Optional[String[1]]"
+    },
+    "playbook": {
+      "description": "Playbook YAML source. Delivered via stdin JSON, never argv — written to a 0600 temp file removed on task exit.",
+      "type": "String[1]"
+    },
+    "extra_vars": {
+      "description": "JSON object text merged into the play; values may be already-resolved secret:// refs, resolved at run time by the console. Written to its own 0600 temp file, never argv. If a play task renders a resolved value (e.g. debug), the console redacts that value from the stored run output server-side, but the value is still exposed to the play's own execution.",
+      "type": "Optional[String[1]]"
+    },
+    "tags": {
+      "description": "Comma-separated tags.",
+      "type": "Optional[String[1]]"
+    },
+    "skip_tags": {
+      "description": "Comma-separated skip-tags.",
+      "type": "Optional[String[1]]"
+    },
+    "check_mode": {
+      "description": "Dry run (adds --check).",
+      "type": "Boolean",
+      "default": false
+    },
+    "install_method": {
+      "description": "How to ensure Ansible is present before the play runs.",
+      "type": "Enum[auto, package, pip, pipx, wsl, skip]",
+      "default": "auto"
+    }
+  }
+}

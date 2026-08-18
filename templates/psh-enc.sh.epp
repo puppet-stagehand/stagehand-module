@@ -1,0 +1,26 @@
+<%- | String[1] $console_url, String[1] $cache_dir | -%>
+#!/bin/sh
+# Managed by stagehand::console_integration — ENC shim with last-good caching
+# (docs/design/enc-cache.md). 200 = emit + refresh cache; 404 = authoritative
+# empty + drop cache; transport failure = serve cache, else empty. Exit 0
+# ALWAYS — this sits in the catalog hot path and must never fail a node.
+CERT="$1"
+CACHE_DIR="<%= $cache_dir %>"
+case "$CERT" in
+  *[!A-Za-z0-9._-]*|"") printf -- '---\nclasses: {}\n'; exit 0 ;;
+esac
+BODY=$(mktemp 2>/dev/null) || { printf -- '---\nclasses: {}\n'; exit 0; }
+CODE=$(curl -sS -o "$BODY" -w '%{http_code}' "<%= $console_url %>/api/v1/enc/$CERT" 2>/dev/null) || CODE=000
+if [ "$CODE" = "200" ] && [ -s "$BODY" ]; then
+  cat "$BODY"
+  TMP=$(mktemp "$CACHE_DIR/.tmp.XXXXXX" 2>/dev/null) && cp "$BODY" "$TMP" && mv "$TMP" "$CACHE_DIR/$CERT.yaml"
+elif [ "$CODE" = "404" ]; then
+  rm -f "$CACHE_DIR/$CERT.yaml"
+  printf -- '---\nclasses: {}\n'
+elif [ -f "$CACHE_DIR/$CERT.yaml" ]; then
+  cat "$CACHE_DIR/$CERT.yaml"
+else
+  printf -- '---\nclasses: {}\n'
+fi
+rm -f "$BODY"
+exit 0

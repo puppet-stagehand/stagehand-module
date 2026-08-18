@@ -1,0 +1,6 @@
+<%- | String[1] $baseuri, String[1] $token | -%>
+# Managed by stagehand::console_integration — do not edit by hand.
+# Console client config shared by the stagehand::hiera_data Hiera backend and the
+# psh trusted-external command. Flat "key: value" (no YAML lib needed).
+baseuri: <%= $baseuri %>
+token: <%= $token %>

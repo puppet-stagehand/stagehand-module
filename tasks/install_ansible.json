@@ -1,0 +1,11 @@
+{
+  "description": "Ensures ansible-playbook is present on the node per install_method (auto/package/pip/pipx/wsl/skip). Standalone task for direct/manual use; stagehand::run_playbook sources this script's install_ansible_run function so a chained install surfaces in the SAME run record rather than as a second Bolt invocation.",
+  "input_method": "stdin",
+  "parameters": {
+    "install_method": {
+      "description": "auto tries the node's package manager then falls back to pip; package/pip/pipx/wsl are dedicated single-strategy installs (no auto fallback between them); skip asserts ansible-playbook is already present.",
+      "type": "Enum[auto, package, pip, pipx, wsl, skip]",
+      "default": "auto"
+    }
+  }
+}

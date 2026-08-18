@@ -1,0 +1,15 @@
+{
+  "description": "Deploy Puppet code for one environment via r10k — the console's on-demand poll (Core polls; PE deploys). Runs on the primary.",
+  "input_method": "environment",
+  "parameters": {
+    "environment": {
+      "description": "Environment to deploy (r10k deploy environment <name> --modules).",
+      "type": "String[1]",
+      "default": "production"
+    },
+    "r10k_path": {
+      "description": "Path to r10k if not on PATH or in the puppet ruby bindir.",
+      "type": "Optional[String[1]]"
+    }
+  }
+}

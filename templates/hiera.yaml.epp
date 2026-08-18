@@ -1,0 +1,22 @@
+<%- | String[1] $client_yaml | -%>
+# Managed by stagehand::console_integration — environment hiera.yaml.
+# The console Data Service tier sits ABOVE the on-disk tiers so console-served
+# data wins, falling back to yaml (and last-good cache) when unavailable.
+version: 5
+defaults:
+  datadir: data
+  data_hash: yaml_data
+hierarchy:
+  - name: "Console data (Data Service)"
+    data_hash: stagehand::hiera_data
+    uris:
+      - "nodes/%{trusted.certname}"
+      - "group/%{trusted.external.psh.primary_group}"
+      - "common"
+    options:
+      config: <%= $client_yaml %>
+      on_error: use_cache
+  - name: "Per-node yaml"
+    path: "nodes/%{trusted.certname}.yaml"
+  - name: "Common yaml"
+    path: "common.yaml"

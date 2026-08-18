@@ -1,0 +1,25 @@
+<%- | Stdlib::Absolutepath $binary,
+      Stdlib::Absolutepath $env_file,
+      String[1] $user,
+      String[1] $group,
+      Stdlib::Absolutepath $working_directory,
+| -%>
+# Managed by stagehand::console — do not edit by hand.
+[Unit]
+Description=Puppet Stagehand Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<%= $user %>
+Group=<%= $group %>
+WorkingDirectory=<%= $working_directory %>
+EnvironmentFile=<%= $env_file %>
+ExecStart=<%= $binary %>
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
