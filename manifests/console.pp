@@ -45,6 +45,42 @@
 # @param puppetserver_fqdn
 #   FQDN of the puppetserver primary this console instance seeds data from.
 #   Defaults to the applying node's own fqdn (co-located install).
+# @param hierascope_binary_source
+#   Local file resource path the installer has staged the hierascope binary
+#   at. Empty string (the default) means "no hierascope staged" — no
+#   `/usr/local/bin/hierascope` file resource is declared and no behavior
+#   changes versus a console-only install.
+# @param hierascope_version
+#   Hierascope release version metadata, passed straight through to the
+#   console's `PCC_HIERASCOPE_VERSION` env var. Installer-supplied.
+# @param hierascope_protocol
+#   Hierascope protocol version metadata, passed straight through to the
+#   console's `PCC_HIERASCOPE_PROTOCOL` env var. Installer-supplied.
+# @param hierascope_sha256
+#   Expected SHA-256 digest of the staged hierascope binary, passed straight
+#   through to the console's `PCC_HIERASCOPE_SHA256` env var so the console
+#   can independently re-verify the artifact (defense in depth).
+# @param hierascope_key_id
+#   Minisign key ID the hierascope release was signed with, passed straight
+#   through to the console's `PCC_HIERASCOPE_KEY_ID` env var.
+# @param hierascope_signature
+#   Minisign signature for the staged hierascope binary (already
+#   newline-escaped by the installer's own env emission convention), passed
+#   straight through to the console's `PCC_HIERASCOPE_SIGNATURE` env var.
+# @param hierascope_goos
+#   GOOS the staged hierascope binary was built for, passed straight through
+#   to the console's `PCC_HIERASCOPE_GOOS` env var.
+# @param hierascope_goarch
+#   GOARCH the staged hierascope binary was built for, passed straight
+#   through to the console's `PCC_HIERASCOPE_GOARCH` env var.
+# @param hierascope_hiera_config
+#   Hiera config path metadata the installer already resolved, passed
+#   straight through to the console's `PCC_HIERASCOPE_HIERA_CONFIG` env var.
+#   Not Puppet-side derivable — pure pass-through metadata.
+# @param hierascope_puppet_major
+#   Puppet major-version metadata the installer already resolved, passed
+#   straight through to the console's `PCC_HIERASCOPE_PUPPET_MAJOR` env var.
+#   Not Puppet-side derivable — pure pass-through metadata.
 #
 # @example Co-located console + puppetserver primary
 #   class { 'stagehand::console':
@@ -54,17 +90,28 @@
 #     dataservice_token     => Sensitive($facts['psh_dataservice_token']),
 #   }
 class stagehand::console (
-  Enum['present', 'latest', 'absent'] $ensure                = 'present',
-  Boolean                             $purge_data             = false,
-  String[1]                           $version                = 'latest',
+  Enum['present', 'latest', 'absent'] $ensure                    = 'present',
+  Boolean                             $purge_data                = false,
+  String[1]                           $version                   = 'latest',
   String[1]                           $console_binary_source,
   Sensitive[String[1]]                $db_password,
   Sensitive[String[1]]                $ingest_token,
   Sensitive[String[1]]                $dataservice_token,
-  Integer[1, 65535]                   $console_port           = 8443,
-  String[1]                           $puppetserver_fqdn      = $facts['networking']['fqdn'],
+  Integer[1, 65535]                   $console_port              = 8443,
+  String[1]                           $puppetserver_fqdn         = $facts['networking']['fqdn'],
+  String                              $hierascope_binary_source  = '',
+  String                              $hierascope_version        = '',
+  String                              $hierascope_protocol       = '',
+  String                              $hierascope_sha256         = '',
+  String                              $hierascope_key_id         = '',
+  String                              $hierascope_signature      = '',
+  String                              $hierascope_goos           = '',
+  String                              $hierascope_goarch         = '',
+  String                              $hierascope_hiera_config   = '',
+  String                              $hierascope_puppet_major   = '',
 ) {
   $binary_path       = '/usr/local/bin/puppet-console'
+  $hierascope_binary_path = '/usr/local/bin/hierascope'
   $service_user       = 'psh'
   $service_group      = 'psh'
   $service_home       = '/var/lib/puppet-console'
@@ -121,6 +168,13 @@ class stagehand::console (
     ],
   }
 
+  # openssl is required by the console's own EYAML PKCS7 operations
+  # regardless of ensure/hierascope configuration -- ensure_packages is
+  # idempotent against any other module's package declaration (T-43-11).
+  # Declared unconditionally (not nested in the present branch below) since
+  # this is a host-level dependency, not a console-lifecycle-tied resource.
+  ensure_packages(['openssl'])
+
   if $ensure != 'absent' {
     user { $service_user:
       ensure => present,
@@ -144,6 +198,24 @@ class stagehand::console (
       mode   => '0755',
       source => $console_binary_source,
       notify => Service['puppet-console'],
+    }
+
+    # Hierascope binary staging -- optional. When the installer hasn't
+    # staged hierascope (hierascope_binary_source == ''), no resource is
+    # declared here and nothing about the console-only path changes. No
+    # `notify` on the console service: hierascope is invoked per-job by the
+    # console, not a long-running service that needs a restart on binary
+    # swap (T-43-10 -- console independently re-verifies via
+    # PCC_HIERASCOPE_* at readiness/execution time regardless of how this
+    # file landed).
+    if $hierascope_binary_source != '' {
+      file { $hierascope_binary_path:
+        ensure => file,
+        owner  => 'root',
+        group  => 'root',
+        mode   => '0755',
+        source => $hierascope_binary_source,
+      }
     }
 
     file { $config_dir:
@@ -354,20 +426,30 @@ class stagehand::console (
       mode      => '0640',
       show_diff => false,
       content   => Sensitive(epp('stagehand/console.env.epp', {
-            'addr'                   => ":${console_port}",
-            'database_url'           => $database_url,
-            'seed_puppetserver_host' => $puppetserver_fqdn,
-            'seed_puppetserver_port' => $puppetserver_port,
-            'seed_puppetdb_host'     => $puppetdb_host,
-            'seed_puppetdb_port'     => $puppetdb_port,
-            'seed_cert'              => $seed_cert,
-            'seed_key'               => $seed_key,
-            'seed_cacert'            => $seed_cacert,
-            'bolt_path'              => $bolt_path,
-            'bolt_project'           => $bolt_project,
-            'external_url'           => $external_url,
-            'ingest_token'           => $ingest_token.unwrap,
-            'dataservice_token'      => $dataservice_token.unwrap,
+            'addr'                     => ":${console_port}",
+            'database_url'             => $database_url,
+            'seed_puppetserver_host'   => $puppetserver_fqdn,
+            'seed_puppetserver_port'   => $puppetserver_port,
+            'seed_puppetdb_host'       => $puppetdb_host,
+            'seed_puppetdb_port'       => $puppetdb_port,
+            'seed_cert'                => $seed_cert,
+            'seed_key'                 => $seed_key,
+            'seed_cacert'              => $seed_cacert,
+            'bolt_path'                => $bolt_path,
+            'bolt_project'             => $bolt_project,
+            'external_url'             => $external_url,
+            'ingest_token'             => $ingest_token.unwrap,
+            'dataservice_token'        => $dataservice_token.unwrap,
+            'hierascope_path'          => $hierascope_binary_path,
+            'hierascope_version'       => $hierascope_version,
+            'hierascope_protocol'      => $hierascope_protocol,
+            'hierascope_sha256'        => $hierascope_sha256,
+            'hierascope_key_id'        => $hierascope_key_id,
+            'hierascope_signature'     => $hierascope_signature,
+            'hierascope_goos'          => $hierascope_goos,
+            'hierascope_goarch'        => $hierascope_goarch,
+            'hierascope_hiera_config'  => $hierascope_hiera_config,
+            'hierascope_puppet_major'  => $hierascope_puppet_major,
       })),
       require   => File[$config_dir],
       notify    => Service['puppet-console'],
