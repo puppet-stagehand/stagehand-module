@@ -223,5 +223,37 @@ $OUT" ;;
 esac
 info "case (f) ruby override: OK (STAGEHAND_RUBY_BIN honored by json_field/json_escape)"
 
+# --- Case (g): $PT__installdir fallback branch still functions (D-08 regression). ---
+# Copies run_playbook.sh into a directory with NO install_ansible.sh sibling
+# (so the $0-relative sibling lookup finds nothing there), and points
+# PT__installdir at a second scratch directory shaped like a real Bolt
+# staging layout (stagehand/tasks/install_ansible.sh under its root). This
+# proves the fallback branch still engages and succeeds after D-08 flips the
+# lookup priority to sibling-first.
+ISOLATED_DIR="$WORK/isolated_run_playbook"
+mkdir -p "$ISOLATED_DIR" || fail "case (g) setup: mkdir isolated dir failed"
+cp "$RUN_PLAYBOOK_SH" "$ISOLATED_DIR/run_playbook.sh" || fail "case (g) setup: cp run_playbook.sh failed"
+
+INSTALLDIR_ROOT="$WORK/installdir_root"
+mkdir -p "$INSTALLDIR_ROOT/stagehand/tasks" || fail "case (g) setup: mkdir installdir root failed"
+cp "$SCRIPT_DIR/install_ansible.sh" "$INSTALLDIR_ROOT/stagehand/tasks/install_ansible.sh" || fail "case (g) setup: cp install_ansible.sh failed"
+
+: > "$ARGV_LOG"
+BODY=$(printf '{"playbook": %s, "install_method": "skip"}' "$(json_encode "$VALID_PLAYBOOK")")
+OUT=$(printf '%s' "$BODY" | \
+  PATH="$TEST_PATH" \
+  STAGEHAND_PLAYBOOK_ANSIBLE_BIN="$SHIMDIR/ansible-playbook" \
+  PT__installdir="$INSTALLDIR_ROOT" \
+  sh "$ISOLATED_DIR/run_playbook.sh")
+RC=$?
+[ "$RC" = "0" ] || fail "case (g) PT__installdir fallback: expected exit 0, got $RC. Output:
+$OUT"
+case "$OUT" in
+  *'"play": {"status": "ok"'*) : ;;
+  *) fail "case (g) PT__installdir fallback: expected play.status==\"ok\", got:
+$OUT" ;;
+esac
+info "case (g) PT__installdir fallback: OK (no sibling install_ansible.sh present; \$PT__installdir fallback engaged and succeeded)"
+
 info "all run_playbook safety cases PASSED"
 exit 0
