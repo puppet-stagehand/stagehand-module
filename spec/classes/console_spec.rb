@@ -148,6 +148,59 @@ describe 'stagehand::console' do
         ],
       )
     }
+
+    # 43-04: no-op proof -- a console-only install (no hierascope_* params)
+    # declares no hierascope file resource, while still always ensuring
+    # openssl (T-43-11, Phase 41's EYAML PKCS7 dependency).
+    it { is_expected.not_to contain_file('/usr/local/bin/hierascope') }
+    it { is_expected.to contain_package('openssl') }
+  end
+
+  # 43-04: hierascope staging + metadata pass-through. Values below are the
+  # real known digest/key_id from 43-01/43-02 (d7508cc1...83868f,
+  # FC69CC1D307726F5) for cross-plan consistency, even though this is a
+  # Puppet-side unit test, not a live verification.
+  context 'with hierascope configured' do
+    let(:params) do
+      required_params.merge(
+        'hierascope_binary_source' => '/opt/staging/hierascope',
+        'hierascope_version'       => '0.1.0',
+        'hierascope_protocol'      => 'hierascope/v1',
+        'hierascope_sha256'        => 'd7508cc1ffc11fed213a46c982e79b694a74726598e834358687a4dfce83868f',
+        'hierascope_key_id'        => 'FC69CC1D307726F5',
+        'hierascope_signature'     => 'line1\nline2',
+        'hierascope_goos'          => 'linux',
+        'hierascope_goarch'        => 'amd64',
+      )
+    end
+
+    it { is_expected.to compile.with_all_deps }
+
+    it {
+      is_expected.to contain_file('/usr/local/bin/hierascope').with(
+        ensure: 'file',
+        owner: 'root',
+        group: 'root',
+        mode: '0755',
+        source: '/opt/staging/hierascope',
+      )
+    }
+
+    it { is_expected.to contain_package('openssl') }
+
+    it 'renders console.env with all ten PCC_HIERASCOPE_* lines carrying the supplied values' do
+      content = catalogue.resource('File', '/etc/puppet-console/console.env')[:content]
+      expect(content).to include('PCC_HIERASCOPE_PATH=/usr/local/bin/hierascope')
+      expect(content).to include('PCC_HIERASCOPE_VERSION=0.1.0')
+      expect(content).to include('PCC_HIERASCOPE_PROTOCOL=hierascope/v1')
+      expect(content).to include('PCC_HIERASCOPE_SHA256=d7508cc1ffc11fed213a46c982e79b694a74726598e834358687a4dfce83868f')
+      expect(content).to include('PCC_HIERASCOPE_KEY_ID=FC69CC1D307726F5')
+      expect(content).to include('PCC_HIERASCOPE_SIGNATURE=line1\nline2')
+      expect(content).to include('PCC_HIERASCOPE_GOOS=linux')
+      expect(content).to include('PCC_HIERASCOPE_GOARCH=amd64')
+      expect(content).to include('PCC_HIERASCOPE_HIERA_CONFIG=')
+      expect(content).to include('PCC_HIERASCOPE_PUPPET_MAJOR=')
+    end
   end
 
   context "with ensure => 'absent'" do
