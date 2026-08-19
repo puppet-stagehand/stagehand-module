@@ -147,20 +147,23 @@ fi
 STAGEHAND_ANSIBLE_BIN="$STAGEHAND_PLAYBOOK_ANSIBLE_BIN"
 export STAGEHAND_ANSIBLE_BIN
 
-# Resolve install_ansible.sh: prefer the Bolt-bundled copy under
-# $PT__installdir (this task's "files" metadata entry, stagehand/tasks/
-# install_ansible.sh — a real Bolt run uploads it alongside this script),
-# falling back to a sibling file in this script's own directory (the case
-# when this script is invoked directly, e.g. by run_playbook_test.sh, where
-# PT__installdir is unset and both scripts sit side by side on disk).
-INSTALLDIR="${PT__installdir:-}"
-if [ -n "$INSTALLDIR" ] && [ -f "$INSTALLDIR/stagehand/tasks/install_ansible.sh" ]; then
-  INSTALL_LIB="$INSTALLDIR/stagehand/tasks/install_ansible.sh"
-else
-  SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || die "could not resolve script dir"
+# Resolve install_ansible.sh: try the module-agnostic $0-relative sibling
+# lookup FIRST (D-08) — a real Bolt run uploads a task's "files" entries
+# into the SAME directory as the primary script (verified against Bolt
+# 4.0.0's lib/bolt/shell/bash.rb run_task / lib/bolt/task.rb tasks_dir this
+# phase), so this survives any future module rename with zero code changes.
+# $PT__installdir/stagehand/tasks/install_ansible.sh (today's hardcoded
+# module-name path) is the secondary fallback, kept for edge cases where $0
+# isn't reliable — per D-07, this stays a one-off inline fix at this single
+# call site, not a generalized helper.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || die "could not resolve script dir"
+if [ -f "$SCRIPT_DIR/install_ansible.sh" ]; then
   INSTALL_LIB="$SCRIPT_DIR/install_ansible.sh"
+elif [ -n "${PT__installdir:-}" ] && [ -f "${PT__installdir}/stagehand/tasks/install_ansible.sh" ]; then
+  INSTALL_LIB="${PT__installdir}/stagehand/tasks/install_ansible.sh"
+else
+  die "install_ansible.sh helper not found (checked \$0-relative and \$PT__installdir)"
 fi
-[ -f "$INSTALL_LIB" ] || die "install_ansible.sh helper not found at $INSTALL_LIB"
 
 STAGEHAND_SOURCED=1
 export STAGEHAND_SOURCED
