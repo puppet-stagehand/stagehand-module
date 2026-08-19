@@ -15,7 +15,11 @@ set -u
 say() { printf '>>> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-PUPPET=/opt/puppetlabs/bin/puppet
+# STAGEHAND_RECERT_PUPPET_BIN exists solely so recert_test.sh can point this
+# script at a stub puppet binary on a curated PATH (mirroring
+# STAGEHAND_DISCOVER_PUPPET_BIN's convention in discover.sh). It is NEVER a
+# Bolt PT_ param.
+PUPPET="${STAGEHAND_RECERT_PUPPET_BIN:-/opt/puppetlabs/bin/puppet}"
 [ -x "$PUPPET" ] || die "puppet agent not installed at $PUPPET"
 [ -n "${PT_challenge:-}" ] || die "challenge parameter is required"
 
