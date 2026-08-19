@@ -20,10 +20,14 @@ if [ -z "$R10K" ]; then
 fi
 [ -n "$R10K" ] || die "r10k not found — install it on the primary or pass r10k_path"
 
-printf '>>> %s deploy environment %s --modules\n' "$R10K" "$ENVIRONMENT"
+printf '>>> %s deploy environment %s --modules\n' "$R10K" "$ENVIRONMENT" >&2
 OUT=$("$R10K" deploy environment "$ENVIRONMENT" --modules -v 2>&1)
 STATUS=$?
-printf '%s\n' "$OUT" | tail -n 40
-[ $STATUS -eq 0 ] || die "r10k exited $STATUS"
+printf '%s\n' "$OUT" | tail -n 40 >&2
+
+if [ "$STATUS" -ne 0 ]; then
+  printf '{"environment": "%s", "status": "error", "error": "r10k exited %s"}\n' "$ENVIRONMENT" "$STATUS"
+  exit 0
+fi
 
 printf '{"environment": "%s", "status": "deployed"}\n' "$ENVIRONMENT"
