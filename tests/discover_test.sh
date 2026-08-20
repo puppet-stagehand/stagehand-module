@@ -48,6 +48,7 @@ PASSWORD_HASH='$6$rounds=656000$abcdEFGH12345678$fixtureOnlyHashValueForUnitTest
 CRON_SECRET_LINE='AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE /opt/backup/run.sh --quiet'
 
 ARGV_LOG="$WORK/argv.log"
+RUBY_ARGV_LOG="$WORK/ruby_argv.log"
 
 # --- puppet stub: records its own argv (one invocation per line, joined by
 # spaces) and emits fixture --to_yaml output per requested type. Supports
@@ -89,6 +90,19 @@ esac
 SHIM
 chmod +x "$SHIMDIR/puppet"
 
+# --- ruby_override stub: proves STAGEHAND_DISCOVER_RUBY_BIN is actually
+# wired into convert_to_json(), not just documented. Records its own
+# invocation (argv, space-joined) to RUBY_ARGV_LOG, then execs the real
+# system `ruby` with the same args so the YAML->JSON conversion still runs
+# correctly end to end (case (e) below asserts BOTH the log was written AND
+# the resulting JSON is correct). ---
+cat > "$SHIMDIR/ruby_override" <<'SHIM'
+#!/bin/sh
+printf '%s\n' "$*" >> "$RUBY_ARGV_LOG"
+exec ruby "$@"
+SHIM
+chmod +x "$SHIMDIR/ruby_override"
+
 # Curated PATH: shim dir first, then a minimal real-tool set (ruby, sed,
 # timeout, mktemp, tr, printf/cat all need to resolve for real). Discovery
 # itself is pointed at the stub via STAGEHAND_DISCOVER_PUPPET_BIN (an absolute
@@ -103,7 +117,9 @@ run_discover() {
   types="$1"
   PATH="$TEST_PATH" \
     ARGV_LOG="$ARGV_LOG" \
+    RUBY_ARGV_LOG="$RUBY_ARGV_LOG" \
     STAGEHAND_DISCOVER_PUPPET_BIN="$SHIMDIR/puppet" \
+    STAGEHAND_DISCOVER_RUBY_BIN="${STAGEHAND_DISCOVER_RUBY_BIN:-}" \
     STAGEHAND_DISCOVER_TIMEOUT_SECS="${STAGEHAND_DISCOVER_TIMEOUT_SECS:-1}" \
     SHIM_USER_PASSWORD_HASH="$PASSWORD_HASH" \
     SHIM_CRON_COMMAND="$CRON_SECRET_LINE" \
@@ -192,6 +208,28 @@ case "$OUT" in
 $OUT" ;;
 esac
 info "case (d) timeout: OK (package timed out, user still succeeded, exit 0)"
+
+# --- Case (e): STAGEHAND_DISCOVER_RUBY_BIN override is actually wired into
+# convert_to_json() -- proven by the stub logging its own invocation AND the
+# resulting conversion still producing correct JSON. ---
+: > "$ARGV_LOG"
+: > "$RUBY_ARGV_LOG"
+SHIM_SLEEP_TYPE=""
+SHIM_SLEEP_SECS=""
+STAGEHAND_DISCOVER_TIMEOUT_SECS="1"
+STAGEHAND_DISCOVER_RUBY_BIN="$SHIMDIR/ruby_override"
+OUT=$(run_discover '["package"]')
+RC=$?
+STAGEHAND_DISCOVER_RUBY_BIN=""
+[ "$RC" = "0" ] || fail "case (e) ruby override: expected exit 0, got $RC. Output:
+$OUT"
+[ -s "$RUBY_ARGV_LOG" ] || fail "case (e) ruby override: STAGEHAND_DISCOVER_RUBY_BIN override stub was never invoked (RUBY_ARGV_LOG is empty) -- convert_to_json() did not route through \$RUBY"
+case "$OUT" in
+  *'"package": {"status": "ok"'*) : ;;
+  *) fail "case (e) ruby override: expected types.package.status==\"ok\", got:
+$OUT" ;;
+esac
+info "case (e) ruby override: OK (STAGEHAND_DISCOVER_RUBY_BIN stub invoked, conversion still correct)"
 
 info "all discovery safety cases PASSED"
 exit 0

@@ -32,6 +32,23 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 PUPPET="${STAGEHAND_DISCOVER_PUPPET_BIN:-/opt/puppetlabs/bin/puppet}"
 [ -x "$PUPPET" ] || die "puppet agent not installed at $PUPPET"
 
+# STAGEHAND_DISCOVER_RUBY_BIN exists solely so discover_test.sh can point
+# convert_to_json() at a stub ruby binary on a curated PATH (mirroring
+# STAGEHAND_DISCOVER_PUPPET_BIN's test-override pattern immediately above).
+# It is NEVER a Bolt PT_ param. Resolution order mirrors the $RUBY pattern
+# already established in run_playbook.sh and install_ansible.sh: targets
+# frequently have NO system ruby on PATH — only the puppet-agent bundled
+# one — so prefer the bundled interpreter and fall back to PATH ruby (dev
+# machines / test harness).
+RUBY="${STAGEHAND_DISCOVER_RUBY_BIN:-}"
+if [ -z "$RUBY" ]; then
+  if [ -x /opt/puppetlabs/puppet/bin/ruby ]; then
+    RUBY=/opt/puppetlabs/puppet/bin/ruby
+  else
+    RUBY=ruby
+  fi
+fi
+
 # Per-type timeout (Pitfall 2 — one slow/aged-host type must not consume the
 # whole task budget). Default: timeout 60 seconds. Overridable via
 # STAGEHAND_DISCOVER_TIMEOUT_SECS for the test harness only (never a Bolt PT_
@@ -57,7 +74,7 @@ RAW_TYPES="${PT_types:-}"
 # Returns non-zero (and no stdout) if the YAML cannot be parsed, so the
 # caller reports status=error for that type instead of crashing the task.
 convert_to_json() {
-  ruby -ryaml -rjson -e '
+  "$RUBY" -ryaml -rjson -e '
 type = ARGV[0]
 
 def redact_passwords(obj)
