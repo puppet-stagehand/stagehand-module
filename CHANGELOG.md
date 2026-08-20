@@ -1,0 +1,17 @@
+# Changelog
+
+## [0.2.0] - 2026-08-20
+
+- refactor: rename pcm module to stagehand (puppetlabs-stagehand) (08ada86)
+- feat(stagehand::console): optional hierascope staging + unconditional openssl (c4b3e29)
+- test(stagehand::console): catalog-compile proof for hierascope staging + openssl (11782ca)
+- refactor(02-02): add STAGEHAND_RECERT_PUPPET_BIN test-only override to recert.sh (bde2cc6)
+- feat(02-02): recert.sh escapes YAML interpolation and embeds JSON on business-logic failure (cf424b5)
+- test(02-02): add recert.sh test harness (RED confirmed pre-fix, now GREEN) (48ea8a5)
+- test(02-03): add failing test for r10k_deploy.sh JSON-on-fail contract (a4ddb97)
+- feat(02-03): r10k_deploy.sh embeds JSON on r10k failure instead of die (bddb950)
+- test(02-03): add run_playbook_test.sh case (g) for the PT__installdir fallback branch (5858e7f)
+- feat(02-03): run_playbook.sh resolves install_ansible.sh sibling-first (D-08), run_playbook.json marks ingest_token sensitive (58e5921)
+- fix(quick): resolve discover.sh's RUBY interpreter instead of bare ruby (bef6f2b)
+- fix(stagehand): correct metadata.json org to puppetlabs, fix README vendoring reference (SPLIT-01, D-01/D-07/D-12) (676845d)
+- fix(stagehand): correct metadata.json/README to unified stagehand Forge author + puppet-stagehand org (SPLIT-01, D-16/D-17/D-18, supersedes D-01) (932d6a3)
