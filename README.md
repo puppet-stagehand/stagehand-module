@@ -3,9 +3,9 @@
 The **stagehand** module (Forge: `puppetlabs-stagehand`): one namespace for every ops task the
 Puppet Stagehand Console invokes, plus `stagehand::console_integration` — the idempotent
 class that wires a puppetserver primary to the console. **This repo is stagehand's
-permanent home**; the `puppet-core-installer` vendors it onto the target
-basemodulepath from GitHub at build time (see the top-level README's Vendoring
-section).
+permanent home**; `puppet-installer` vendors it directly by git URL and tag,
+pinned in its own `vendor.yaml` and fetched by its `scripts/vendor-modules.sh`
+(no Puppetfile/r10k involved) — see that repo's own docs for the exact pin.
 
 ## Classes
 
