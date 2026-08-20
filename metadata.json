@@ -1,12 +1,12 @@
 {
-  "name": "puppetlabs-stagehand",
+  "name": "stagehand-stagehand",
   "version": "0.2.0",
-  "author": "puppetlabs",
+  "author": "stagehand",
   "summary": "Puppet Stagehand — the console-invoked ops tasks, the puppetserver integration, and the branded node_encrypt helpers for the Puppet Stagehand Console.",
   "license": "Apache-2.0",
-  "source": "https://github.com/puppetlabs/stagehand",
-  "project_page": "https://github.com/puppetlabs/stagehand",
-  "issues_url": "https://github.com/puppetlabs/stagehand/issues",
+  "source": "https://github.com/puppet-stagehand/stagehand",
+  "project_page": "https://github.com/puppet-stagehand/stagehand",
+  "issues_url": "https://github.com/puppet-stagehand/stagehand/issues",
   "dependencies": [
     { "name": "puppetlabs/stdlib", "version_requirement": ">= 9.0.0 < 10.0.0" },
     { "name": "puppetlabs/node_encrypt", "version_requirement": ">= 2.0.0 < 5.0.0" }

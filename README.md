@@ -1,6 +1,6 @@
 # stagehand — Puppet Stagehand
 
-The **stagehand** module (Forge: `puppetlabs-stagehand`): one namespace for every ops task the
+The **stagehand** module (Forge: `stagehand-stagehand`): one namespace for every ops task the
 Puppet Stagehand Console invokes, plus `stagehand::console_integration` — the idempotent
 class that wires a puppetserver primary to the console. **This repo is stagehand's
 permanent home**; `puppet-installer` vendors it directly by git URL and tag,
