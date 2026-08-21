@@ -1,8 +1,8 @@
 {
   "name": "stagehand-stagehand",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "stagehand",
-  "summary": "Puppet Stagehand — the console-invoked ops tasks, the puppetserver integration, and the branded node_encrypt helpers for the Puppet Stagehand Console.",
+  "summary": "Puppet Stagehand — console-invoked ops tasks, puppetserver integration, and branded node_encrypt helpers for the Puppet Stagehand Console.",
   "license": "Apache-2.0",
   "source": "https://github.com/puppet-stagehand/stagehand",
   "project_page": "https://github.com/puppet-stagehand/stagehand",

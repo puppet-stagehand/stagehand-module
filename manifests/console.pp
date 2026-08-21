@@ -90,13 +90,13 @@
 #     dataservice_token     => Sensitive($facts['psh_dataservice_token']),
 #   }
 class stagehand::console (
-  Enum['present', 'latest', 'absent'] $ensure                    = 'present',
-  Boolean                             $purge_data                = false,
-  String[1]                           $version                   = 'latest',
   String[1]                           $console_binary_source,
   Sensitive[String[1]]                $db_password,
   Sensitive[String[1]]                $ingest_token,
   Sensitive[String[1]]                $dataservice_token,
+  Enum['present', 'latest', 'absent'] $ensure                    = 'present',
+  Boolean                             $purge_data                = false,
+  String[1]                           $version                   = 'latest',
   Integer[1, 65535]                   $console_port              = 8443,
   String[1]                           $puppetserver_fqdn         = $facts['networking']['fqdn'],
   String                              $hierascope_binary_source  = '',

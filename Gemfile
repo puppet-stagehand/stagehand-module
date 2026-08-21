@@ -16,4 +16,9 @@ group :test do
   gem 'puppetlabs_spec_helper', '~> 8.0'
   gem 'rspec-puppet', '~> 5.0'
   gem 'rspec-puppet-facts', '~> 6.1'
+  # Without this gem, puppetlabs_spec_helper's metadata_lint rake task
+  # silently skips ("the metadata-json-lint gem was not found") instead of
+  # failing -- a validate/lint/metadata_lint CI job that can't actually
+  # fail on bad metadata.json is a check in name only.
+  gem 'metadata-json-lint', '~> 4.0'
 end
