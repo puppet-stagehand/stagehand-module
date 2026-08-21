@@ -65,7 +65,7 @@ class stagehand::console_integration (
   String[1]                    $puppetserver_service   = 'puppetserver',
   Boolean                      $manage_service         = true,
 ) {
-  $token_str = $token =~ Sensitive ? { true => $token.unwrap, default => $token }
+  $token_str = if $token =~ Sensitive { $token.unwrap } else { $token }
 
   $client_dir   = '/etc/puppetlabs/psh'
   $client_yaml  = "${client_dir}/client.yaml"
@@ -142,15 +142,15 @@ class stagehand::console_integration (
     }
 
     stagehand::console_integration::puppet_conf { 'node_terminus':
-      value       => 'exec',
-      bin         => $bin,
-      svc_notify  => $svc_notify,
+      value      => 'exec',
+      bin        => $bin,
+      svc_notify => $svc_notify,
     }
     stagehand::console_integration::puppet_conf { 'external_nodes':
-      value       => $enc_path,
-      bin         => $bin,
-      svc_notify  => $svc_notify,
-      require     => File[$enc_path],
+      value      => $enc_path,
+      bin        => $bin,
+      svc_notify => $svc_notify,
+      require    => File[$enc_path],
     }
   }
 
