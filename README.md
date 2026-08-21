@@ -7,6 +7,9 @@ permanent home**; `puppet-installer` vendors it directly by git URL and tag,
 pinned in its own `vendor.yaml` and fetched by its `scripts/vendor-modules.sh`
 (no Puppetfile/r10k involved) — see that repo's own docs for the exact pin.
 
+See [`RELEASE.md`](RELEASE.md) for the CI/security-scan gates and the release
+process — read it before cutting a tag.
+
 ## Classes
 
 - **`stagehand::console_integration`** — apply on the **primary** to wire it to the
