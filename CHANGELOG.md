@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.1] - 2026-08-21
+
+- feat(tasks): add class_enumerate — read-only applied-classes report for the console's ENC discovery/import wizard, ported from puppet-console's pre-split adapters/pcm/ copy (added there post-split, never previously landed here)
+
 ## [0.2.0] - 2026-08-20
 
 - refactor: rename pcm module to stagehand (puppetlabs-stagehand) (08ada86)

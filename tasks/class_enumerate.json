@@ -1,0 +1,4 @@
+{
+  "description": "Read-only report of a node's currently-applied Puppet classes, read from the agent's local applied-classes state file — never a live catalog compile, never a set-form Puppet Server call.",
+  "input_method": "environment"
+}

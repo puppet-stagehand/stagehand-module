@@ -57,6 +57,10 @@ README for its task and, for the scanners, the `compliance.v1` schema.
 - `stagehand::install_ansible` — standalone entry point for the same install
   logic `stagehand::run_playbook` sources; useful for pre-staging Ansible on a
   node directly.
+- `stagehand::class_enumerate` — read-only report of a node's currently-applied
+  Puppet classes, read from the agent's local `classes.txt` state file. Never
+  a live catalog compile, never a set-form Puppet Server call. Ruby (not sh)
+  so it runs identically on Linux and Windows targets.
 
 ## Functions / facts / templates
 
