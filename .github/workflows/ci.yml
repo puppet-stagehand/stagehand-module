@@ -55,7 +55,12 @@ jobs:
           - label: "Puppet Core 7"
             gem_name: puppet
             gem_version: "~> 7.0"
-            ruby_version: "2.7"
+            # 3.2, not puppet 7's own minimum (Ruby >= 2.5) -- the fixed
+            # (non-matrix) rspec-puppet-facts ~> 6.1 dependency in Gemfile
+            # requires Ruby >= 3.2 regardless of which Puppet is under
+            # test; this is pure test-tooling parsing the DSL, not a live
+            # agent run, so it's independent of Puppet 7's own Ruby floor.
+            ruby_version: "3.2"
             experimental: false
           - label: "Puppet Core 8"
             gem_name: puppet

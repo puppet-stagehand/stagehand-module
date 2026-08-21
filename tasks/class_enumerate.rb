@@ -30,7 +30,7 @@
 
 require 'json'
 require 'rbconfig'
-require 'english'
+require 'English'
 
 # STAGEHAND_CLASS_ENUMERATE_PUPPET_BIN / STAGEHAND_CLASS_ENUMERATE_STATEDIR_OVERRIDE
 # override the puppet binary path / statedir directly for local/dev testing,

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.3] - 2026-08-21
+
+- fix(tasks): class_enumerate.rb required `english` (lowercase) instead of Ruby stdlib's actual `English` (capital E) file -- silently masked on case-insensitive filesystems (macOS, Windows) but a hard LoadError on every real Linux target, which is this task's actual deployment platform. Caught by running the CI just added against a real Linux runner for the first time; local macOS testing had given false confidence.
+
 ## [0.2.2] - 2026-08-21
 
 - fix(console): reorder class parameters so required params precede optional ones (parameter_order lint fix, no behavior change -- Puppet class declarations are always named-parameter, never positional)
