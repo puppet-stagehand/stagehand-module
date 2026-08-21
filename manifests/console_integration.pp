@@ -142,15 +142,15 @@ class stagehand::console_integration (
     }
 
     stagehand::console_integration::puppet_conf { 'node_terminus':
-      value       => 'exec',
-      bin         => $bin,
-      svc_notify  => $svc_notify,
+      value      => 'exec',
+      bin        => $bin,
+      svc_notify => $svc_notify,
     }
     stagehand::console_integration::puppet_conf { 'external_nodes':
-      value       => $enc_path,
-      bin         => $bin,
-      svc_notify  => $svc_notify,
-      require     => File[$enc_path],
+      value      => $enc_path,
+      bin        => $bin,
+      svc_notify => $svc_notify,
+      require    => File[$enc_path],
     }
   }
 
