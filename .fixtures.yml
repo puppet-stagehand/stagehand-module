@@ -3,5 +3,3 @@ fixtures:
     stdlib:
       repo: puppetlabs/stdlib
       ref: '9.6.0'
-  symlinks:
-    stagehand: "#{source_dir}"

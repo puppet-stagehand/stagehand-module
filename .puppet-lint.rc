@@ -1,0 +1,17 @@
+# Managed by modulesync - DO NOT EDIT
+# https://voxpupuli.org/docs/updating-files-managed-with-modulesync/
+
+--fail-on-warnings
+--no-parameter_documentation-check
+--no-parameter_types-check
+
+# DEVIATION FROM UPSTREAM (puppet-stagehand/stagehand): stagehand::console's
+# ten `hierascope_*` params intentionally default `String $x = ''` as a real,
+# load-bearing "not staged" sentinel (see manifests/console.pp line ~211,
+# `if $hierascope_binary_source != '' { ... }`, and the hash passed to
+# templates/console.env.epp) rather than the puppet-lint-preferred
+# `Optional[String] $x = undef`. Converting that would touch the gating
+# conditional and the env-file template rendering, not just the parameter
+# declaration -- out of scope for CI scaffolding. Re-apply this line after
+# any modulesync sync that touches this file.
+--no-params_empty_string_assignment-check
