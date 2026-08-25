@@ -1,0 +1,5 @@
+{
+  "description": "Install and start an OpenSSH server on this host if not already present — idempotent, safe to run repeatedly. Detects the package manager (apt/dnf/yum/zypper) rather than assuming one.",
+  "input_method": "environment",
+  "parameters": {}
+}

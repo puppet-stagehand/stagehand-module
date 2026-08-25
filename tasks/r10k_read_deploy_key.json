@@ -1,0 +1,10 @@
+{
+  "description": "Reads an existing r10k/control-repo deploy key's PRIVATE key material off this host and returns it. SECURITY-SENSITIVE: only invoke on explicit operator consent to import an existing key — never as part of passive detection. The private key parameter in the response must be treated as sensitive by every caller.",
+  "input_method": "environment",
+  "parameters": {
+    "key_path": {
+      "type": "Optional[String[1]]",
+      "description": "Path to the existing deploy key to read, as surfaced by the read-only r10k_detect task's key-path probe (never a console-guessed default beyond what detection already surfaced). Defaults to the same conventional r10k deploy-key locations r10k_detect itself probes when omitted."
+    }
+  }
+}

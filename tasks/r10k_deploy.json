@@ -10,6 +10,14 @@
     "r10k_path": {
       "description": "Path to r10k if not on PATH or in the puppet ruby bindir.",
       "type": "Optional[String[1]]"
+    },
+    "git_ssh_config": {
+      "description": "Optional per-run multi-host ssh_config content (Phase 47, D-10) staged to a temp dir on the primary for the duration of this deploy, then removed on every exit path (success, r10k failure, or process kill). Sensitive: carries no key material itself, but is unconditionally declared Sensitive to match the same discipline applied to git_ssh_keys below.",
+      "type": "Optional[Sensitive[String]]"
+    },
+    "git_ssh_keys": {
+      "description": "Optional JSON object mapping sanitized host -> PEM private key content, staged alongside git_ssh_config for the duration of this deploy only.",
+      "type": "Optional[Sensitive[String]]"
     }
   }
 }

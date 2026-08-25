@@ -39,6 +39,9 @@
 # @param manage_trusted_external    Manage the trusted-external command. Default true.
 # @param manage_hiera               Manage the environment hiera.yaml tier. Default true.
 # @param manage_autosign            Manage the policy-autosign hook. Default true.
+# @param manage_ssh_server
+#   Manage the OpenSSH server package by default on supported Debian- and
+#   RedHat-family primaries. Disable only when SSH is owned elsewhere.
 # @param puppetserver_service
 #   Service to refresh when the wiring changes. Default 'puppetserver'.
 # @param manage_service
@@ -62,10 +65,17 @@ class stagehand::console_integration (
   Boolean                      $manage_trusted_external = true,
   Boolean                      $manage_hiera           = true,
   Boolean                      $manage_autosign        = true,
+  Boolean                      $manage_ssh_server      = true,
   String[1]                    $puppetserver_service   = 'puppetserver',
   Boolean                      $manage_service         = true,
 ) {
   $token_str = if $token =~ Sensitive { $token.unwrap } else { $token }
+
+  if $manage_ssh_server and $facts['os']['family'] in ['Debian', 'RedHat'] {
+    package { 'openssh-server':
+      ensure => installed,
+    }
+  }
 
   $client_dir   = '/etc/puppetlabs/psh'
   $client_yaml  = "${client_dir}/client.yaml"

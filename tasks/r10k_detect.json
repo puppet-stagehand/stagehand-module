@@ -1,0 +1,5 @@
+{
+  "description": "Read-only discovery of an existing r10k/Puppetfile configuration on the primary — reads r10k.yaml and every environment's Puppetfile content, never executes anything they reference, never mutates state.",
+  "input_method": "environment",
+  "parameters": {}
+}
