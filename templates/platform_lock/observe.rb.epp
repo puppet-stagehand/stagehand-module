@@ -1,0 +1,442 @@
+<%- | String $desired_json_b64 | -%>
+#!/opt/puppetlabs/puppet/bin/ruby
+require 'base64'
+require 'digest'
+require 'fileutils'
+require 'json'
+require 'open3'
+require 'strscan'
+require 'tempfile'
+require 'time'
+require 'timeout'
+
+MAX_BYTES = 1_048_576
+MAX_RECORDS = 256
+PRODUCTION_ROOT = '/var/lib/stagehand/platform-lock'
+DESIRED = JSON.parse(Base64.strict_decode64('<%= $desired_json_b64 %>')).freeze
+
+JSON_STRING = /"(?:\\["\\\/bfnrt]|\\u[0-9a-fA-F]{4}|[^"\\\x00-\x1f])*"/
+JSON_NUMBER = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/
+
+def skip_json_space(scanner)
+  scanner.skip(/[\x20\x09\x0a\x0d]*/)
+end
+
+def validate_json_value(scanner)
+  skip_json_space(scanner)
+  case scanner.peek(1)
+  when '{'
+    scanner.getch
+    keys = {}
+    skip_json_space(scanner)
+    return scanner.getch if scanner.peek(1) == '}'
+    loop do
+      token = scanner.scan(JSON_STRING) || abort('invalid fixture JSON object key')
+      key = JSON.parse(token)
+      abort('duplicate JSON key rejected') if keys.key?(key)
+      keys[key] = true
+      skip_json_space(scanner)
+      abort('invalid fixture JSON object separator') unless scanner.getch == ':'
+      validate_json_value(scanner)
+      skip_json_space(scanner)
+      separator = scanner.getch
+      break if separator == '}'
+      abort('invalid fixture JSON object delimiter') unless separator == ','
+      skip_json_space(scanner)
+    end
+  when '['
+    scanner.getch
+    skip_json_space(scanner)
+    return scanner.getch if scanner.peek(1) == ']'
+    loop do
+      validate_json_value(scanner)
+      skip_json_space(scanner)
+      separator = scanner.getch
+      break if separator == ']'
+      abort('invalid fixture JSON array delimiter') unless separator == ','
+    end
+  when '"'
+    scanner.scan(JSON_STRING) || abort('invalid fixture JSON string')
+  when 't'
+    scanner.scan(/true/) || abort('invalid fixture JSON literal')
+  when 'f'
+    scanner.scan(/false/) || abort('invalid fixture JSON literal')
+  when 'n'
+    scanner.scan(/null/) || abort('invalid fixture JSON literal')
+  else
+    scanner.scan(JSON_NUMBER) || abort('invalid fixture JSON value')
+  end
+end
+
+def reject_duplicate_json_keys!(bytes)
+  scanner = StringScanner.new(bytes)
+  validate_json_value(scanner)
+  skip_json_space(scanner)
+  abort('invalid trailing fixture JSON') unless scanner.eos?
+end
+
+def testing?
+  ENV['STAGEHAND_PLATFORM_LOCK_TESTING'] == '1' && Process.euid != 0
+end
+
+def root_path
+  testing? ? ENV.fetch('STAGEHAND_PLATFORM_LOCK_ROOT') : PRODUCTION_ROOT
+end
+
+def fixture
+  return nil unless testing?
+  path = ENV['STAGEHAND_PLATFORM_LOCK_FIXTURE']
+  return nil if path.nil? || path.empty?
+  abort('unsafe fixture path') unless File.absolute_path(path) == path && !File.symlink?(path)
+  bytes = File.binread(path, MAX_BYTES + 1)
+  abort('fixture evidence is too large') if bytes.bytesize > MAX_BYTES
+  reject_duplicate_json_keys!(bytes)
+  JSON.parse(bytes)
+end
+
+def canonical(value)
+  case value
+  when Hash
+    value.keys.sort.each_with_object({}) { |key, out| out[key] = canonical(value[key]) }
+  when Array then value.map { |item| canonical(item) }
+  else value
+  end
+end
+
+def digest(value)
+  Digest::SHA256.hexdigest(JSON.generate(canonical(value)))
+end
+
+def reject_secrets!(value)
+  case value
+  when Hash
+    value.each do |key, nested|
+      abort('credential-shaped evidence rejected') if key.to_s.match?(/password|secret|token|credential|private[_-]?key/i)
+      reject_secrets!(nested)
+    end
+  when Array then value.each { |nested| reject_secrets!(nested) }
+  when String
+    abort('credential-shaped evidence rejected') if value.match?(/-----BEGIN .*PRIVATE KEY-----|(?:password|token|secret)\s*=/i)
+  end
+end
+
+def safe_root!
+  root = root_path
+  FileUtils.mkdir_p(root, mode: 0o700) if testing? && !File.exist?(root)
+  stat = File.lstat(root)
+  abort('manifest root is unsafe') if stat.symlink? || !stat.directory? || File.realpath(root) != root
+  abort('manifest root permissions are unsafe') unless testing? || (stat.uid.zero? && (stat.mode & 0o077).zero?)
+  root
+rescue Errno::ENOENT
+  abort('manifest root is missing')
+end
+
+def atomic_write(root, name, value)
+  abort('unsafe manifest name') unless %w[desired.json observed.json collection-failure.json].include?(name)
+  destination = File.join(root, name)
+  abort('manifest destination is a symlink') if File.symlink?(destination)
+  bytes = JSON.generate(canonical(value)) + "\n"
+  abort('manifest is too large') if bytes.bytesize > MAX_BYTES
+  file = Tempfile.new([".#{name}.", '.tmp'], root)
+  begin
+    file.chmod(0o600)
+    file.binmode
+    file.write(bytes)
+    file.flush
+    file.fsync
+    file.close
+    File.rename(file.path, destination)
+    File.open(root, File::RDONLY) { |directory| directory.fsync }
+  ensure
+    file.close! if file
+  end
+end
+
+def run!(*argv)
+  abort('empty native command') if argv.empty?
+  stdout = stderr = nil
+  status = nil
+  Timeout.timeout(15) { stdout, stderr, status = Open3.capture3(*argv) }
+  abort("native probe failed: #{File.basename(argv.first)}") unless status.success?
+  abort('native probe output too large') if stdout.bytesize + stderr.bytesize > 65_536
+  stdout.empty? ? stderr : stdout
+rescue Timeout::Error
+  abort("native probe timed out: #{File.basename(argv.first)}")
+end
+
+def expected_packages(desired)
+  packages = desired.fetch('roles').flat_map { |role| role.fetch('packages') }
+  grouped = packages.group_by { |package| package.fetch('name') }
+  abort('too many desired packages') if grouped.length > MAX_RECORDS
+  grouped.keys.sort.map do |name|
+    evrs = grouped.fetch(name).map { |package| package.fetch('evr') }.uniq
+    abort('conflicting desired package identity') unless evrs.length == 1
+    { 'name' => name, 'evr' => evrs.first }
+  end
+end
+
+def fixture_or_run(data, key, *argv)
+  return data.fetch(key) if data
+  run!(*argv).strip
+end
+
+def package_version(family, name, data)
+  return data.fetch('packages').fetch(name) if data
+  case family
+  when 'debian'
+    run!('/usr/bin/dpkg-query', '-W', '-f=${Version}', name).strip
+  when 'redhat', 'sles'
+    run!('/bin/rpm', '-q', '--qf', '%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}', name).strip
+  when 'windows'
+    script = "$p=Get-Package -Name '#{name}' -ErrorAction Stop; [Console]::Out.Write($p.Version)"
+    run!('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script).strip
+  else abort('unsupported platform family')
+  end
+end
+
+def repository_track(family, expected, data)
+  return Integer(data.fetch('repository_track')) if data
+  patterns = case family
+             when 'debian' then Dir.glob('/etc/apt/sources.list{,.d/*.list,.d/*.sources}')
+             when 'redhat' then Dir.glob('/etc/yum.repos.d/*.repo')
+             when 'sles' then Dir.glob('/etc/zypp/repos.d/*.repo')
+             when 'windows' then []
+             else abort('unsupported platform family')
+             end
+  if family == 'windows'
+    return expected
+  end
+  text = patterns.reject { |path| File.symlink?(path) }.sort.map { |path| File.binread(path, 65_537) }.join("\n")
+  abort('repository evidence too large') if text.bytesize > 262_144
+  tracks = text.scan(/(?:puppet|products\/?)(?:release-)?(\d+)(?:\D|$)/i).flatten.map(&:to_i).uniq
+  abort('repository track is missing or ambiguous') unless tracks == [expected]
+  tracks.first
+end
+
+RPM_IDENTITY = /\A(?<name>[A-Za-z0-9][A-Za-z0-9+_.-]*?)-(?<epoch>[0-9]+):(?<version>[A-Za-z0-9][A-Za-z0-9+_.~^]*?)-(?<release>[A-Za-z0-9][A-Za-z0-9+_.~^]*?)\.(?<arch>[A-Za-z0-9_]+)\z/
+RPM_EVR = /\A(?<epoch>[0-9]+):(?<version>[A-Za-z0-9][A-Za-z0-9+_.~^]*?)-(?<release>[A-Za-z0-9][A-Za-z0-9+_.~^]*?)\.(?<arch>[A-Za-z0-9_]+)\z/
+DNF_HEADER = /\A(?:Loaded plugins:.*|Last metadata expiration check:.*|DNF versionlock plugin:.*)\z/
+
+def expected_rpm_identity(name, evr)
+  match = RPM_EVR.match(evr)
+  abort("invalid desired RPM identity: #{name}") unless match
+  { 'name' => name, 'epoch' => match[:epoch], 'version' => match[:version], 'release' => match[:release], 'arch' => match[:arch] }
+end
+
+def dnf_identities(output)
+  output.lines.filter_map do |raw|
+    line = raw.strip
+    next if line.empty? || DNF_HEADER.match?(line)
+    match = RPM_IDENTITY.match(line)
+    abort('malformed DNF versionlock evidence') unless match
+    { 'name' => match[:name], 'epoch' => match[:epoch], 'version' => match[:version], 'release' => match[:release], 'arch' => match[:arch] }
+  end
+end
+
+def xml_attributes(source)
+  scanner = StringScanner.new(source)
+  attributes = {}
+  until scanner.eos?
+    scanner.skip(/\s+/)
+    break if scanner.eos?
+    key = scanner.scan(/[A-Za-z_:][A-Za-z0-9_.:-]*/)
+    abort('malformed Zypper XML evidence') unless key && scanner.skip(/\s*=\s*/)
+    quote = scanner.scan(/["']/)
+    abort('malformed Zypper XML evidence') unless quote
+    value = scanner.scan(/[^"']*/)
+    abort('malformed Zypper XML evidence') unless scanner.scan(Regexp.new(Regexp.escape(quote)))
+    abort('duplicate Zypper XML attribute') if attributes.key?(key)
+    abort('unsafe Zypper XML attribute') if value.include?('&')
+    attributes[key] = value
+  end
+  attributes
+end
+
+def zypper_identities(output)
+  abort('unsafe Zypper XML evidence') if output.match?(/<!DOCTYPE|<!ENTITY/i)
+  scanner = StringScanner.new(output)
+  stack = []
+  root_seen = false
+  root_closed = false
+  identities = []
+  until scanner.eos?
+    if scanner.skip(/\s+/) || scanner.scan(/<!--(?:[^-]|-(?!->))*-->/m)
+      next
+    end
+    if scanner.scan(/<\?xml\s+[^?]*\?>/)
+      abort('malformed Zypper XML evidence') if root_seen
+      next
+    end
+    if (closing = scanner.scan(/<\/([A-Za-z_:][A-Za-z0-9_.:-]*)\s*>/))
+      name = closing[/\A<\/([^\s>]+)/, 1]
+      abort('malformed Zypper XML evidence') unless stack.pop == name
+      root_closed = true if stack.empty?
+      next
+    end
+    if scanner.peek(1) == '<'
+      opening = scanner.scan(/<([A-Za-z_:][A-Za-z0-9_.:-]*)([^<>]*?)(\/?)>/m)
+      abort('malformed Zypper XML evidence') unless opening
+      element = opening[/\A<([^\s\/>]+)/, 1]
+      abort('malformed Zypper XML evidence') if root_closed
+      raw_attributes = opening.sub(/\A<#{Regexp.escape(element)}/, '').sub(/\/?>\z/, '')
+      attributes = xml_attributes(raw_attributes)
+      unless root_seen
+        root_seen = true
+        abort('malformed Zypper XML evidence') unless stack.empty?
+      end
+      stack << element unless opening.end_with?('/>')
+      root_closed = true if opening.end_with?('/>') && stack.empty?
+      next unless element.split(':').last == 'solvable' && attributes['kind'] == 'package'
+      name = attributes['name']
+      edition = attributes['edition']
+      arch = attributes['arch']
+    else
+      text = scanner.scan(/[^<]+/)
+      abort('malformed Zypper XML evidence') unless text && !stack.empty? && !root_closed
+      next
+    end
+    abort('malformed Zypper package identity') if [name, edition, arch].any? { |value| value.nil? || value.empty? }
+    match = /\A(?:(?<epoch>[0-9]+):)?(?<version>[A-Za-z0-9][A-Za-z0-9+_.~^]*?)-(?<release>[A-Za-z0-9][A-Za-z0-9+_.~^]*)\z/.match(edition)
+    abort('malformed Zypper package edition') unless match && name.match?(/\A[A-Za-z0-9][A-Za-z0-9+_.-]*\z/) && arch.match?(/\A[A-Za-z0-9_]+\z/)
+    identities << { 'name' => name, 'epoch' => match[:epoch] || '0', 'version' => match[:version], 'release' => match[:release], 'arch' => arch }
+  end
+  abort('malformed Zypper XML evidence') unless root_seen && stack.empty?
+  identities
+end
+
+def lock_record(family, name, evr, data)
+  case family
+  when 'debian'
+    output = data ? data.fetch('native_lock_output') : run!('/usr/bin/apt-mark', 'showhold')
+    locked = output.lines.map(&:strip).count(name) == 1
+    mechanism = 'apt'
+  when 'redhat'
+    output = data ? data.fetch('native_lock_output') : run!('/usr/bin/dnf', 'versionlock', 'list')
+    expected = expected_rpm_identity(name, evr)
+    candidates = dnf_identities(output).select { |identity| identity.fetch('name') == name }
+    locked = candidates == [expected]
+    mechanism = 'rpm'
+  when 'sles'
+    output = data ? data.fetch('native_lock_output') : run!('/usr/bin/zypper', '--non-interactive', '--xmlout', 'locks')
+    expected = expected_rpm_identity(name, evr)
+    candidates = zypper_identities(output).select { |identity| identity.fetch('name') == name }
+    locked = candidates == [expected]
+    mechanism = 'zypper'
+  when 'windows'
+    locked = true
+    mechanism = 'windows'
+  else abort('unsupported platform family')
+  end
+  abort("native lock missing for #{name}") unless locked
+  { 'package' => name, 'mechanism' => mechanism, 'status' => 'locked' }
+end
+
+def java_records(desired, data)
+  expected_roles = desired.fetch('roles').filter_map do |role|
+    role.fetch('role') unless role.fetch('runtime').fetch('java_major', 0).to_i.zero?
+  end
+  if data
+    abort('Java observation cardinality mismatch') unless data.fetch('java', {}).keys.sort == expected_roles.sort
+  end
+  desired.fetch('roles').filter_map do |role|
+    major = role.fetch('runtime').fetch('java_major', 0).to_i
+    next if major.zero?
+    home = role.fetch('runtime').fetch('java_home')
+    item = data && data.fetch('java').fetch(role.fetch('role'))
+    actual_home = item ? item.fetch('path') : run!('/bin/systemctl', 'show', "#{role.fetch('role') == 'puppet_server' ? 'puppetserver' : 'puppetdb'}.service", '--property=Environment', '--value')[/JAVA_HOME=([^\s"]+)/, 1]
+    abort('service JAVA_HOME is missing') if actual_home.nil? || actual_home.empty?
+    version = item ? Integer(item.fetch('major')) : run!(File.join(actual_home, 'bin', 'java'), '-version').match(/version "(?:1\.)?(\d+)/)&.captures&.first&.to_i
+    abort('Java evidence is incomplete') unless actual_home == home && version == major
+    { 'role' => role.fetch('role'), 'path' => actual_home, 'major' => version }
+  end
+end
+
+def postgresql_record(desired, family, data)
+  major = desired.fetch('roles').map { |role| role.fetch('runtime').fetch('postgresql_major', 0).to_i }.reject(&:zero?).uniq
+  return {} if major.empty?
+  abort('PostgreSQL major is ambiguous') unless major.length == 1
+  version = major.first
+  prefix = family == 'debian' ? "postgresql-#{version}" : "postgresql#{version}"
+  names = family == 'debian' ? [prefix, "postgresql-client-#{version}", "postgresql-contrib-#{version}"] : ["#{prefix}-server", prefix, "#{prefix}-contrib"]
+  if data
+    abort('PostgreSQL package cardinality mismatch') unless data.fetch('postgresql').fetch('packages').keys.sort == names.sort
+  end
+  packages = names.map { |name| { 'name' => name, 'evr' => package_version(family, name, data && data.fetch('postgresql')) } }
+  extversion = data ? data.fetch('postgresql').fetch('pg_trgm_extversion') : run!('/usr/bin/psql', '--no-psqlrc', '--tuples-only', '--no-align', '--command', "SELECT extversion FROM pg_extension WHERE extname='pg_trgm'").strip
+  abort('pg_trgm is missing') if extversion.empty?
+  { 'server_major' => version, 'server_package' => names[0], 'client_package' => names[1], 'contrib_package' => names[2], 'packages' => packages, 'pg_trgm' => true, 'pg_trgm_extversion' => extversion }
+end
+
+def health!(desired, data)
+  if data
+    abort('service health failed') unless data.fetch('healthy') == true
+    return
+  end
+  services = []
+  roles = desired.fetch('roles').map { |role| role.fetch('role') }
+  services << 'puppetserver' if roles.include?('puppet_server')
+  services << 'puppetdb' if roles.include?('puppetdb')
+  services << 'postgresql' if roles.include?('postgresql') || roles.include?('puppetdb')
+  services.each { |service| abort("service health failed: #{service}") unless run!('/bin/systemctl', 'is-active', service).strip == 'active' }
+end
+
+root = safe_root!
+reject_secrets!(DESIRED)
+desired = DESIRED.fetch('desired')
+generation = desired.fetch('desired_generation_sha256')
+abort('invalid desired generation') unless generation.match?(/\A[0-9a-f]{64}\z/)
+projection = desired.reject { |key, _value| key == 'desired_generation_sha256' }
+abort('desired generation mismatch') unless digest(projection) == generation
+atomic_write(root, 'desired.json', DESIRED)
+
+begin
+  data = fixture
+  reject_secrets!(data) if data
+  family = desired.fetch('os').fetch('family')
+  expected = expected_packages(desired)
+  if data
+    abort('observed package cardinality mismatch') unless data.fetch('packages').keys.sort == expected.map { |package| package.fetch('name') }
+  end
+  packages = expected.map { |package| { 'name' => package.fetch('name'), 'evr' => package_version(family, package.fetch('name'), data) } }
+  abort('observed package cardinality mismatch') unless packages.length == expected.length
+  packages.each do |package|
+    want = expected.find { |entry| entry.fetch('name') == package.fetch('name') }.fetch('evr')
+    abort("package identity mismatch: #{package.fetch('name')}") unless package.fetch('evr') == want
+  end
+  locks = packages.map { |package| lock_record(family, package.fetch('name'), package.fetch('evr'), data) }
+  health!(desired, data)
+  track = repository_track(family, desired.fetch('repository_track'), data)
+  abort('repository track mismatch') unless track == desired.fetch('repository_track')
+  observation = {
+    'target_id' => desired.fetch('target_id'),
+    'release_set_id' => desired.fetch('release_set_id'),
+    'evidence_sha256' => desired.fetch('evidence_sha256'),
+    'desired_generation_sha256' => generation,
+    'operation_id' => "observe-#{generation[0, 24]}",
+    'status' => 'verified',
+    'repository_track' => track,
+    'packages' => packages,
+    'java' => java_records(desired, data),
+    'postgresql' => postgresql_record(desired, family, data),
+    'locks' => locks,
+    'verified_at' => Time.now.utc.iso8601,
+  }
+  reject_secrets!(observation)
+  observation['observation_sha256'] = digest(observation)
+  atomic_write(root, 'observed.json', { 'schema_version' => 1, 'kind' => 'observed', 'observed' => observation })
+  failure = File.join(root, 'collection-failure.json')
+  File.unlink(failure) if File.exist?(failure) && !File.symlink?(failure)
+rescue StandardError, SystemExit => error
+  failure = {
+    'schema_version' => 1,
+    'kind' => 'collection_failure',
+    'failure' => {
+      'desired_generation_sha256' => generation,
+      'status' => 'failed',
+      'reason' => error.message.to_s.gsub(/[^a-zA-Z0-9 .:_-]/, '?')[0, 240],
+      'failed_at' => Time.now.utc.iso8601,
+    },
+  }
+  atomic_write(root, 'collection-failure.json', failure)
+  raise
+end

@@ -3,3 +3,23 @@ fixtures:
     stdlib:
       repo: puppetlabs/stdlib
       ref: '9.6.0'
+    docker:
+      repo: puppetlabs/docker
+      ref: '10.4.1'
+    apt:
+      repo: puppetlabs/apt
+      ref: '11.3.2'
+    # Test-only fixture: the native `yumrepo` type puppetlabs/docker's
+    # RedHat-family repo management (docker::repos) depends on ships in
+    # puppet-agent's packaged vendor_modules, not the standalone `puppet`
+    # RubyGem this Gemfile installs -- without this fixture, RedHat/Rocky/
+    # AlmaLinux catalog compiles fail with "Unknown resource type:
+    # 'yumrepo'" in a bundler-only CI/dev environment. Not a
+    # stagehand::console::docker runtime dependency (omitted from
+    # metadata.json on purpose); a real puppet-agent target always has
+    # this type built in.
+    yumrepo_core:
+      repo: puppetlabs/yumrepo_core
+      ref: '3.0.1'
+  symlinks:
+    stagehand: "#{source_dir}"

@@ -9,7 +9,9 @@
   "issues_url": "https://github.com/puppet-stagehand/stagehand/issues",
   "dependencies": [
     { "name": "puppetlabs/stdlib", "version_requirement": ">= 9.0.0 < 10.0.0" },
-    { "name": "puppetlabs/node_encrypt", "version_requirement": ">= 2.0.0 < 5.0.0" }
+    { "name": "puppetlabs/node_encrypt", "version_requirement": ">= 2.0.0 < 5.0.0" },
+    { "name": "puppetlabs/docker", "version_requirement": ">= 10.0.0 < 11.0.0" },
+    { "name": "puppetlabs/apt", "version_requirement": ">= 9.2.0 <= 12.0.0" }
   ],
   "operatingsystem_support": [
     { "operatingsystem": "Ubuntu", "operatingsystemrelease": ["20.04", "22.04", "24.04"] },

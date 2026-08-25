@@ -9,6 +9,15 @@ pinned in its own `vendor.yaml` and fetched by its `scripts/vendor-modules.sh`
 
 ## Classes
 
+- **`stagehand::platform_lock`** — consumes one installer-selected entry from
+  `data/platform_contract_v1.json`, validates exact package ownership by VM
+  role, and applies the matching native APT, DNF/Yum, Zypper, or Windows MSI
+  lock. Puppet Server and PuppetDB receive separate service-specific
+  `JAVA_HOME` settings; PostgreSQL is constrained by major-qualified package
+  families rather than an exact patch build. The class also writes separate
+  root-only desired and observed manifests under
+  `/var/lib/stagehand/platform-lock` using a validate, fsync, and rename flow.
+  A failed replacement preserves the prior valid manifest.
 - **`stagehand::console_integration`** — apply on the **primary** to wire it to the
   console at compile time: cache-aware ENC shim (`GET /api/v1/enc/<cert>`),
   self-contained trusted-external command (`GET /api/v1/external-data/<cert>`
@@ -152,6 +161,27 @@ flavors, so most differences are about what's already on the box, not code:
 
 `console_integration`'s default paths (`confdir`/`codedir`) are the shared
 AIO layout and don't need to change across any of the above.
+
+## Platform lock contract and support evidence
+
+Stagehand is the source owner of `data/platform_contract_v1.json`.
+`puppet-installer` vendors that file byte-for-byte and selects a role entry;
+neither repository may synthesize missing EVRs or use one Puppet version for
+all components. The contract keeps `puppet-agent`, `puppetserver`, `puppetdb`,
+and `puppetdb-termini` identities distinct and leaves Java and PostgreSQL on
+service-specific major-family guards so routine security patches remain
+available.
+
+Repository availability is not platform-lock support evidence. The module-wide
+`metadata.json` support list continues to describe the already-tested Stagehand
+classes; it does not promote a platform-lock tuple. A lock tuple is supported
+only after schema-valid live evidence proves native locking, service runtime,
+catalog/report, and interruption recovery for that exact contract tuple. The
+initial approved release set is deliberately `unvalidated`, and the SLES and
+Windows adapters are not added to module support metadata merely because they
+compile.
+See the Puppet Stagehand operator documentation for the per-role package table,
+drift diagnosis, and controlled unlock/upgrade/relock procedure.
 
 ## Stage it (dev loop, until the installer vendors the pack)
 

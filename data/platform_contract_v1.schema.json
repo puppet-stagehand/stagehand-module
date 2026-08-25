@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stagehand.puppet.com/schemas/platform_contract_v1.schema.json",
+  "title": "Puppet Stagehand platform contract v1",
+  "description": "Schema for role-aware, release-gated Puppet package sets. This schema contains no release values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "approved", "sets"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "approved": { "type": "boolean" },
+    "sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/release_set" }
+    }
+  },
+  "$defs": {
+    "release_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["set_id", "puppet_track", "support_disposition", "evidence", "tuples"],
+      "properties": {
+        "set_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+        "puppet_track": { "type": "integer", "minimum": 1 },
+        "support_disposition": { "enum": ["supported", "unsupported", "unvalidated"] },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "tuples": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/platform_tuple" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source", "sha256", "authenticated"],
+      "properties": {
+        "kind": { "enum": ["repository_metadata", "lifecycle", "runtime_compatibility", "acceptance"] },
+        "source": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "authenticated": { "const": true }
+      }
+    },
+    "platform_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os_family", "architecture", "role", "repository_track", "packages", "runtime"],
+      "properties": {
+        "os_family": { "enum": ["debian", "redhat", "sles", "windows"] },
+        "architecture": { "enum": ["amd64", "arm64"] },
+        "role": { "enum": ["agent", "puppet_server", "puppetdb", "postgresql"] },
+        "repository_track": { "type": "integer", "minimum": 1 },
+        "packages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/native_package" }
+        },
+        "runtime": { "$ref": "#/$defs/runtime" }
+      }
+    },
+    "native_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "evr"],
+      "properties": {
+        "name": { "enum": ["puppet-agent", "puppetserver", "puppetdb", "puppetdb-termini"] },
+        "evr": { "type": "string", "minLength": 1 }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "java_major": { "type": "integer", "minimum": 1 },
+        "postgresql_major": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

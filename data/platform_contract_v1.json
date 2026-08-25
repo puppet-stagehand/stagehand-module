@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "approved": true,
+  "sets": [
+    {
+      "set_id": "puppet-core-9-v1",
+      "puppet_track": 9,
+      "support_disposition": "unvalidated",
+      "evidence": [
+        {
+          "kind": "repository_metadata",
+          "source": "https://apt-puppetcore.puppet.com",
+          "sha256": "ed90dd436217adca704e0b7b65da0df53f13c66b1defe21f4bef058e8b917d6c",
+          "authenticated": true
+        },
+        {
+          "kind": "repository_metadata",
+          "source": "https://yum-puppetcore.puppet.com",
+          "sha256": "612d4619df385e91e83f7c60606ba5b904fdedc10c4d78564885bd9dedd947cd",
+          "authenticated": true
+        },
+        {
+          "kind": "repository_metadata",
+          "source": "release-candidates-v1.json",
+          "sha256": "fe62fe9d17c8aac17f0e1863f679d7d6d329b26272596a4e0451d3de1271aa33",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/debian-noble-amd64-agent.json#artifact_id=b6932e7273f5d4e9f05f7eaff8a2a3d6389d70ad33a162882b736bd64905288d",
+          "sha256": "1679eb6f341c263ec58ac29301e48211db08053d50b66ae36f36e4f0d4303213",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/debian-noble-amd64-postgresql.json#artifact_id=69a1b082d7b7ba42fda7c6efc0efc8d9173ee1214370afbd0ae40b04e0b64e29",
+          "sha256": "6b97435eeab730f98b828c1dd86026ea16e76cf19e8d67e12f4597a611ac4a37",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/debian-noble-amd64-puppet_server.json#artifact_id=1ac6a667dc61441aa17b94f48af8a9d270e10fd0f62ff37307fcd4fb0bccbec8",
+          "sha256": "d5fd966dae03131c3ddf54549f9de8268592647811d7d7db70449e05318d2890",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/debian-noble-amd64-puppetdb.json#artifact_id=b46f20ac34510b807ed0f7c1bb56889127e2ecd7390891bdc0cf234031770a9f",
+          "sha256": "155d1351988e54e5a39a5f23b53530f69f8d734f0fb018d332bffd4cfff72bf2",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/redhat-el-9-amd64-agent.json#artifact_id=4787bad336f73a01dc11196160f51a1e333d65ec25ae4a0ddae68151c9f7bc59",
+          "sha256": "d688c8479c01bb08cbbfb3d0dcf8ebd1e65ce7a071ead53ba9a8d892296bd4c1",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/redhat-el-9-amd64-postgresql.json#artifact_id=86b24d887ef4f55ed3ac4485211c80b54faadb02fea8d8c7b0685d10ffc66c73",
+          "sha256": "248fc9e1a6e04bfb02edd2c618a361993274a99b9a8acf555e6b40188694f06f",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/redhat-el-9-amd64-puppet_server.json#artifact_id=be11bfdca59515ea9ff6b7473f5181ec89a474aeed45f7f5dc61f0d8d61f2d9d",
+          "sha256": "d700410d407b40d609801189dcdbfdcdc6d11549bc7d06da604e960c8ef446a4",
+          "authenticated": true
+        },
+        {
+          "kind": "acceptance",
+          "source": "puppet-core-9-v1/redhat-el-9-amd64-puppetdb.json#artifact_id=901bf7f475327dce10cd38f483e9834bfee94cc456848dedc6adf33b3d1640a7",
+          "sha256": "c946374156484c45d15d86487d694c4c7a542915af8fb70290a1a3739f38c4c0",
+          "authenticated": true
+        }
+      ],
+      "tuples": [
+        {
+          "os_family": "debian",
+          "architecture": "amd64",
+          "role": "agent",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "9.0.0-1noble"
+            }
+          ],
+          "runtime": {}
+        },
+        {
+          "os_family": "debian",
+          "architecture": "amd64",
+          "role": "postgresql",
+          "repository_track": 9,
+          "packages": [],
+          "runtime": {
+            "postgresql_major": 17
+          }
+        },
+        {
+          "os_family": "debian",
+          "architecture": "amd64",
+          "role": "puppet_server",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "9.0.0-1noble"
+            },
+            {
+              "name": "puppetdb-termini",
+              "evr": "9.0.1-1noble"
+            },
+            {
+              "name": "puppetserver",
+              "evr": "9.0.2-1noble"
+            }
+          ],
+          "runtime": {
+            "java_major": 21
+          }
+        },
+        {
+          "os_family": "debian",
+          "architecture": "amd64",
+          "role": "puppetdb",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "9.0.0-1noble"
+            },
+            {
+              "name": "puppetdb",
+              "evr": "9.0.1-1noble"
+            }
+          ],
+          "runtime": {
+            "java_major": 17,
+            "postgresql_major": 17
+          }
+        },
+        {
+          "os_family": "redhat",
+          "architecture": "amd64",
+          "role": "agent",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "0:9.0.0-1.el9.x86_64"
+            }
+          ],
+          "runtime": {}
+        },
+        {
+          "os_family": "redhat",
+          "architecture": "amd64",
+          "role": "postgresql",
+          "repository_track": 9,
+          "packages": [],
+          "runtime": {
+            "postgresql_major": 17
+          }
+        },
+        {
+          "os_family": "redhat",
+          "architecture": "amd64",
+          "role": "puppet_server",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "0:9.0.0-1.el9.x86_64"
+            },
+            {
+              "name": "puppetdb-termini",
+              "evr": "0:9.0.1-1.el9.noarch"
+            },
+            {
+              "name": "puppetserver",
+              "evr": "0:9.0.2-1.el9.noarch"
+            }
+          ],
+          "runtime": {
+            "java_major": 21
+          }
+        },
+        {
+          "os_family": "redhat",
+          "architecture": "amd64",
+          "role": "puppetdb",
+          "repository_track": 9,
+          "packages": [
+            {
+              "name": "puppet-agent",
+              "evr": "0:9.0.0-1.el9.x86_64"
+            },
+            {
+              "name": "puppetdb",
+              "evr": "0:9.0.1-1.el9.noarch"
+            }
+          ],
+          "runtime": {
+            "java_major": 17,
+            "postgresql_major": 17
+          }
+        }
+      ]
+    }
+  ]
+}
