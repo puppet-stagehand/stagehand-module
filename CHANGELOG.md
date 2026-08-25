@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0] - 2026-08-25
+
+- feat(tasks): add read-only r10k detection, deploy-key import, multi-host SSH staging, and explicit SSH-server remediation for the Stagehand control-repository setup flow
+- feat(stagehand::console_integration): manage the SSH server by default so the dedicated Stagehand SSH identity can reach the primary without sharing the Puppet Core root identity
+- feat(platform-lock): add the authoritative role-aware Puppet package contract, exact native package locks, Java/PostgreSQL family guards, desired/observed manifests, interruption recovery, and live-evidence schema
+- feat(stagehand::console::docker): add the container integration consumed by installer-managed Stagehand deployments
+
 ## [0.2.1] - 2026-08-21
 
 - feat(tasks): add class_enumerate — read-only applied-classes report for the console's ENC discovery/import wizard, ported from puppet-console's pre-split adapters/pcm/ copy (added there post-split, never previously landed here)
