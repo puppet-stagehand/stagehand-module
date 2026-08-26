@@ -268,8 +268,8 @@ class stagehand::platform_lock (
     }
     exec { 'stagehand-platform-lock-observe-pg-trgm-extension':
       command     => $facts['os']['family'] ? {
-        'RedHat' => "/usr/sbin/runuser -u postgres -- /usr/pgsql-${postgresql_major}/bin/psql --no-psqlrc --tuples-only --dbname postgres --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
-        default  => "/usr/sbin/runuser -u postgres -- /usr/bin/psql --no-psqlrc --tuples-only --dbname postgres --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+        'RedHat' => "/usr/sbin/runuser -u postgres -- /usr/pgsql-${postgresql_major}/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+        default  => "/usr/sbin/runuser -u postgres -- /usr/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
       },
       refreshonly => true,
       logoutput   => false,

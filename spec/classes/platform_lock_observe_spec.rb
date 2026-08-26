@@ -60,6 +60,11 @@ RSpec.describe 'stagehand::platform_lock' do
     JSON.parse(Base64.strict_decode64(encoded))
   end
 
+  it 'probes pg_trgm as postgres in the PuppetDB database' do
+    expect(helper_content).to include("run!('/usr/sbin/runuser', '-u', 'postgres', '--', psql")
+    expect(helper_content).to include("'--dbname', 'puppetdb'")
+  end
+
   it 'normalizes derived Java homes into the immutable desired snapshot' do
     homes = desired_document.fetch('desired').fetch('roles').filter_map { |role| role.dig('runtime', 'java_home') }
     expect(homes).to contain_exactly('/usr/lib/jvm/java-21-openjdk-amd64', '/usr/lib/jvm/java-17-openjdk-amd64')

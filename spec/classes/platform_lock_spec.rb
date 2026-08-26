@@ -232,7 +232,7 @@ RSpec.describe 'stagehand::platform_lock' do
     it { is_expected.not_to contain_package('stagehand-platform-lock-postgresql-contrib') }
     it do
       is_expected.to contain_exec('stagehand-platform-lock-observe-pg-trgm-extension').with(
-        command: %r{/usr/sbin/runuser -u postgres -- /usr/bin/psql .*--dbname postgres},
+        command: %r{/usr/sbin/runuser -u postgres -- /usr/bin/psql .*--dbname puppetdb},
       )
     end
 

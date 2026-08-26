@@ -363,7 +363,7 @@ def postgresql_record(desired, family, data)
   end
   packages = names.map { |name| { 'name' => name, 'evr' => package_version(family, name, data && data.fetch('postgresql')) } }
   psql = family == 'redhat' ? "/usr/pgsql-#{version}/bin/psql" : '/usr/bin/psql'
-  extversion = data ? data.fetch('postgresql').fetch('pg_trgm_extversion') : run!('/usr/sbin/runuser', '-u', 'postgres', '--', psql, '--no-psqlrc', '--tuples-only', '--no-align', '--dbname', 'postgres', '--command', "SELECT extversion FROM pg_extension WHERE extname='pg_trgm'").strip
+  extversion = data ? data.fetch('postgresql').fetch('pg_trgm_extversion') : run!('/usr/sbin/runuser', '-u', 'postgres', '--', psql, '--no-psqlrc', '--tuples-only', '--no-align', '--dbname', 'puppetdb', '--command', "SELECT extversion FROM pg_extension WHERE extname='pg_trgm'").strip
   abort('pg_trgm is missing') if extversion.empty?
   record = { 'server_major' => version, 'server_package' => names[0], 'client_package' => names[1], 'packages' => packages, 'pg_trgm' => true, 'pg_trgm_extversion' => extversion }
   record['contrib_package'] = names[2] unless family == 'debian'
