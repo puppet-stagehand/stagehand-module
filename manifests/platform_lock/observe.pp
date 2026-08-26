@@ -23,11 +23,18 @@ class stagehand::platform_lock::observe (
     ('postgresql' in $role_names or 'puppetdb' in $role_names) ? { true => $postgresql_service, false => undef },
   ].filter |$service| { $service != undef }
 
+  file { '/var/lib/stagehand':
+    ensure => directory,
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0700',
+  }
   file { $root:
     ensure => directory,
     owner  => 'root',
     group  => 'root',
     mode   => '0700',
+    require => File['/var/lib/stagehand'],
   }
   file { $helper:
     ensure    => file,

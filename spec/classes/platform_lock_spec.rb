@@ -252,6 +252,7 @@ RSpec.describe 'stagehand::platform_lock' do
 
     it { is_expected.to contain_class('stagehand::platform_lock::observe') }
     it { is_expected.to contain_file('/usr/local/sbin/stagehand-platform-lock-observe').with(owner: 'root', group: 'root', mode: '0700') }
+    it { is_expected.to contain_file('/var/lib/stagehand').with(owner: 'root', group: 'root', mode: '0700') }
     it { is_expected.to contain_file('/var/lib/stagehand/platform-lock').with(owner: 'root', group: 'root', mode: '0700') }
     it { is_expected.to contain_exec('stagehand-platform-lock-observe').with(command: '/usr/local/sbin/stagehand-platform-lock-observe') }
 
