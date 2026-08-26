@@ -357,14 +357,17 @@ def postgresql_record(desired, family, data)
   abort('PostgreSQL major is ambiguous') unless major.length == 1
   version = major.first
   prefix = family == 'debian' ? "postgresql-#{version}" : "postgresql#{version}"
-  names = family == 'debian' ? [prefix, "postgresql-client-#{version}", "postgresql-contrib-#{version}"] : ["#{prefix}-server", prefix, "#{prefix}-contrib"]
+  names = family == 'debian' ? [prefix, "postgresql-client-#{version}"] : ["#{prefix}-server", prefix, "#{prefix}-contrib"]
   if data
     abort('PostgreSQL package cardinality mismatch') unless data.fetch('postgresql').fetch('packages').keys.sort == names.sort
   end
   packages = names.map { |name| { 'name' => name, 'evr' => package_version(family, name, data && data.fetch('postgresql')) } }
-  extversion = data ? data.fetch('postgresql').fetch('pg_trgm_extversion') : run!('/usr/bin/psql', '--no-psqlrc', '--tuples-only', '--no-align', '--command', "SELECT extversion FROM pg_extension WHERE extname='pg_trgm'").strip
+  psql = family == 'redhat' ? "/usr/pgsql-#{version}/bin/psql" : '/usr/bin/psql'
+  extversion = data ? data.fetch('postgresql').fetch('pg_trgm_extversion') : run!('/usr/sbin/runuser', '-u', 'postgres', '--', psql, '--no-psqlrc', '--tuples-only', '--no-align', '--dbname', 'postgres', '--command', "SELECT extversion FROM pg_extension WHERE extname='pg_trgm'").strip
   abort('pg_trgm is missing') if extversion.empty?
-  { 'server_major' => version, 'server_package' => names[0], 'client_package' => names[1], 'contrib_package' => names[2], 'packages' => packages, 'pg_trgm' => true, 'pg_trgm_extversion' => extversion }
+  record = { 'server_major' => version, 'server_package' => names[0], 'client_package' => names[1], 'packages' => packages, 'pg_trgm' => true, 'pg_trgm_extversion' => extversion }
+  record['contrib_package'] = names[2] unless family == 'debian'
+  record
 end
 
 def health!(desired, data)
@@ -376,7 +379,11 @@ def health!(desired, data)
   roles = desired.fetch('roles').map { |role| role.fetch('role') }
   services << 'puppetserver' if roles.include?('puppet_server')
   services << 'puppetdb' if roles.include?('puppetdb')
-  services << 'postgresql' if roles.include?('postgresql') || roles.include?('puppetdb')
+  postgres_major = desired.fetch('roles').map { |role| role.fetch('runtime').fetch('postgresql_major', 0).to_i }.reject(&:zero?).uniq.first
+  if postgres_major && (roles.include?('postgresql') || roles.include?('puppetdb'))
+    family = desired.fetch('os').fetch('family')
+    services << (family == 'debian' ? "postgresql@#{postgres_major}-main" : (family == 'redhat' ? "postgresql-#{postgres_major}" : 'postgresql'))
+  end
   services.each { |service| abort("service health failed: #{service}") unless run!('/bin/systemctl', 'is-active', service).strip == 'active' }
 end
 

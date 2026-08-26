@@ -8,10 +8,19 @@ class stagehand::platform_lock::observe (
   $desired_json = inline_template('<%= require "json"; JSON.generate(@desired) %>')
   $desired_json_b64 = inline_template('<%= require "base64"; Base64.strict_encode64(@desired_json) %>')
   $role_names = $desired['desired']['roles'].map |Hash $role| { $role['role'] }
+  $postgresql_majors = unique($desired['desired']['roles'].map |Hash $role| { $role['runtime']['postgresql_major'] }.filter |$major| { $major != undef })
+  $postgresql_service = $postgresql_majors.empty ? {
+    true    => undef,
+    default => $desired['desired']['os']['family'] ? {
+      'debian' => "postgresql@${postgresql_majors[0]}-main",
+      'redhat' => "postgresql-${postgresql_majors[0]}",
+      default  => 'postgresql',
+    },
+  }
   $health_services = [
     'puppet_server' in $role_names ? { true => 'puppetserver', false => undef },
     'puppetdb' in $role_names ? { true => 'puppetdb', false => undef },
-    ('postgresql' in $role_names or 'puppetdb' in $role_names) ? { true => 'postgresql', false => undef },
+    ('postgresql' in $role_names or 'puppetdb' in $role_names) ? { true => $postgresql_service, false => undef },
   ].filter |$service| { $service != undef }
 
   file { $root:

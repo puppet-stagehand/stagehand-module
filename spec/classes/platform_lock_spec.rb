@@ -200,6 +200,8 @@ RSpec.describe 'stagehand::platform_lock' do
     it { is_expected.to contain_package('stagehand-platform-lock-java-17').with_ensure('installed') }
     it { is_expected.to contain_file('/etc/systemd/system/puppetserver.service.d/20-stagehand-java.conf').with_content(%r{JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64}) }
     it { is_expected.to contain_file('/etc/systemd/system/puppetdb.service.d/20-stagehand-java.conf').with_content(%r{JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64}) }
+    it { is_expected.to contain_exec('stagehand-platform-lock-restart-puppetserver').with(command: '/bin/systemctl try-restart puppetserver', refreshonly: true) }
+    it { is_expected.to contain_exec('stagehand-platform-lock-restart-puppetdb').with(command: '/bin/systemctl try-restart puppetdb', refreshonly: true) }
 
     context 'with an unsafe JAVA_HOME' do
       let(:params) do
@@ -215,8 +217,12 @@ RSpec.describe 'stagehand::platform_lock' do
 
     it { is_expected.to contain_package('stagehand-platform-lock-postgresql-server').with(name: 'postgresql-17', ensure: 'installed') }
     it { is_expected.to contain_package('stagehand-platform-lock-postgresql-client').with(name: 'postgresql-client-17', ensure: 'installed') }
-    it { is_expected.to contain_package('stagehand-platform-lock-postgresql-contrib').with(name: 'postgresql-contrib-17', ensure: 'installed') }
-    it { is_expected.to contain_exec('stagehand-platform-lock-observe-pg-trgm-extension') }
+    it { is_expected.not_to contain_package('stagehand-platform-lock-postgresql-contrib') }
+    it do
+      is_expected.to contain_exec('stagehand-platform-lock-observe-pg-trgm-extension').with(
+        command: %r{/usr/sbin/runuser -u postgres -- /usr/bin/psql .*--dbname postgres},
+      )
+    end
 
     context 'with the adjacent supported major' do
       let(:params) do

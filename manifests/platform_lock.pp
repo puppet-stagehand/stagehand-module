@@ -216,6 +216,24 @@ class stagehand::platform_lock (
       path        => ['/usr/bin', '/bin'],
     }
   }
+  if !$server_entries.empty {
+    exec { 'stagehand-platform-lock-restart-puppetserver':
+      command     => '/bin/systemctl try-restart puppetserver',
+      refreshonly => true,
+      path        => ['/usr/bin', '/bin'],
+      subscribe   => File['/etc/systemd/system/puppetserver.service.d/20-stagehand-java.conf'],
+      require     => Exec['stagehand-platform-lock-systemd-reload'],
+    }
+  }
+  if !$puppetdb_entries.empty {
+    exec { 'stagehand-platform-lock-restart-puppetdb':
+      command     => '/bin/systemctl try-restart puppetdb',
+      refreshonly => true,
+      path        => ['/usr/bin', '/bin'],
+      subscribe   => File['/etc/systemd/system/puppetdb.service.d/20-stagehand-java.conf'],
+      require     => Exec['stagehand-platform-lock-systemd-reload'],
+    }
+  }
 
   $postgresql_majors = unique($roles.map |Hash $entry| { $entry['runtime']['postgresql_major'] }.filter |$major| { $major != undef })
   if $postgresql_majors.length > 1 {
@@ -230,7 +248,6 @@ class stagehand::platform_lock (
       'Debian' => {
         'server'  => "postgresql-${postgresql_major}",
         'client'  => "postgresql-client-${postgresql_major}",
-        'contrib' => "postgresql-contrib-${postgresql_major}",
       },
       'RedHat' => {
         'server'  => "postgresql${postgresql_major}-server",
@@ -254,11 +271,14 @@ class stagehand::platform_lock (
       }
     }
     exec { 'stagehand-platform-lock-observe-pg-trgm-extension':
-      command     => "/usr/bin/psql --no-psqlrc --tuples-only --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+      command     => $facts['os']['family'] ? {
+        'RedHat' => "/usr/sbin/runuser -u postgres -- /usr/pgsql-${postgresql_major}/bin/psql --no-psqlrc --tuples-only --dbname postgres --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+        default  => "/usr/sbin/runuser -u postgres -- /usr/bin/psql --no-psqlrc --tuples-only --dbname postgres --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+      },
       refreshonly => true,
       logoutput   => false,
       path        => ['/usr/bin', '/bin'],
-      require     => Package['stagehand-platform-lock-postgresql-contrib'],
+      require     => Package['stagehand-platform-lock-postgresql-server'],
     }
   }
 
@@ -315,13 +335,17 @@ class stagehand::platform_lock (
       # lint:endignore
     ].filter |$resource| { $resource != undef }
     $reload_after = $java_majors.empty ? { true => [], false => [Exec['stagehand-platform-lock-systemd-reload']] }
+    $restart_after = [
+      !$server_entries.empty ? { true => Exec['stagehand-platform-lock-restart-puppetserver'], false => undef },
+      !$puppetdb_entries.empty ? { true => Exec['stagehand-platform-lock-restart-puppetdb'], false => undef },
+    ].filter |$resource| { $resource != undef }
     $postgres_after = $postgresql_majors.empty ? {
       true    => [],
-      default => ['server', 'client', 'contrib'].map |String $component| { Package["stagehand-platform-lock-postgresql-${component}"] } + [Exec['stagehand-platform-lock-observe-pg-trgm-extension']],
+      default => $postgresql_packages.keys.map |String $component| { Package["stagehand-platform-lock-postgresql-${component}"] } + [Exec['stagehand-platform-lock-observe-pg-trgm-extension']],
     }
     class { 'stagehand::platform_lock::observe':
       desired => $desired_snapshot,
-      after   => $package_after + $lock_after + $runtime_after + $java_config_after + $reload_after + $postgres_after,
+      after   => $package_after + $lock_after + $runtime_after + $java_config_after + $reload_after + $restart_after + $postgres_after,
     }
   }
 }

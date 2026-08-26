@@ -106,7 +106,6 @@ RSpec.describe 'stagehand::platform_lock' do
         'packages' => {
           'postgresql-17' => '17.5-1',
           'postgresql-client-17' => '17.5-1',
-          'postgresql-contrib-17' => '17.5-1',
         },
         'pg_trgm_extversion' => '1.6',
       },
@@ -259,6 +258,8 @@ RSpec.describe 'stagehand::platform_lock' do
     expect(helper).to include("Open3.capture3(*argv)")
     expect(helper).to include("'/usr/bin/dpkg-query'")
     expect(helper).to include("'/usr/bin/apt-mark'")
+    expect(helper).to include("'/usr/sbin/runuser', '-u', 'postgres'")
+    expect(helper).to include('postgresql@#{postgres_major}-main')
     expect(helper).to include('Timeout.timeout(15)')
     expect(helper).to include('file.fsync')
     expect(helper).to include('File.rename')
@@ -326,7 +327,7 @@ RSpec.describe 'stagehand::platform_lock' do
       complete_fixture.merge('repository_track' => 8),
       complete_fixture.merge('api_token' => 'do-not-collect'),
       complete_fixture.merge('java' => complete_fixture['java'].except('puppetdb')),
-      complete_fixture.merge('postgresql' => complete_fixture['postgresql'].merge('packages' => complete_fixture.dig('postgresql', 'packages').except('postgresql-contrib-17'))),
+      complete_fixture.merge('postgresql' => complete_fixture['postgresql'].merge('packages' => complete_fixture.dig('postgresql', 'packages').except('postgresql-client-17'))),
       complete_fixture.merge('postgresql' => complete_fixture['postgresql'].except('pg_trgm_extversion')),
     ]
     mutations.each do |fixture_data|
