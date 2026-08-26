@@ -3,9 +3,23 @@
 
 source ENV['GEM_SOURCE'] || 'https://rubygems.org'
 
+# CI_PUPPET_GEM_NAME/CI_PUPPET_GEM_VERSION let the release CI matrix (see
+# .github/workflows/ci.yml) select Puppet Core vs OpenVox and a version
+# range without editing this file per leg. OpenVox ships as the "openvox"
+# gem but is a drop-in for the "puppet" gem's own Puppet:: Ruby namespace,
+# so rspec-puppet/rspec-puppet-facts work unchanged against either — this
+# is purely a gem-name/version swap, no test code branches on which one is
+# loaded. Local `bundle install` with no env vars keeps the split repo's
+# supported Puppet range (>= 7, < 9).
+
 group :test do
   gem 'voxpupuli-test', '~> 14.0',  :require => false
   gem 'puppet_metadata', '~> 6.1',  :require => false
+  # Without this gem, puppetlabs_spec_helper's metadata_lint rake task
+  # silently skips ("the metadata-json-lint gem was not found") instead of
+  # failing -- a validate/lint/metadata_lint CI job that can't actually
+  # fail on bad metadata.json is a check in name only.
+  gem 'metadata-json-lint', '~> 4.0', :require => false
 end
 
 group :development do
@@ -22,7 +36,8 @@ end
 # beta line anyway (see ci.yml's openvox9-beta job: dependency-resolution
 # only, continue-on-error), so skip this group entirely for that scenario
 # rather than let Bundler's resolver fail closed on an unresolvable graph.
-openvox_gem_version = ENV['OPENVOX_GEM_VERSION']
+openvox_gem_version = ENV['OPENVOX_GEM_VERSION'] ||
+                      (ENV['CI_PUPPET_GEM_NAME'] == 'openvox' ? ENV['CI_PUPPET_GEM_VERSION'] : nil)
 skip_system_tests_for_openvox_beta = openvox_gem_version && openvox_gem_version.match?(/\A9\.|pre|beta|alpha/i)
 
 group :system_tests do
@@ -44,10 +59,10 @@ gem 'rake', :require => false
 # CI leg (puppet7/puppet8 vs openvox8/openvox9) only ever sets ONE of
 # PUPPET_GEM_VERSION/OPENVOX_GEM_VERSION, so select exactly one gem here
 # rather than declaring both unconditionally.
-if ENV['OPENVOX_GEM_VERSION']
-  gem 'openvox', ENV['OPENVOX_GEM_VERSION'], :require => false, :groups => [:test]
+if ENV['CI_PUPPET_GEM_NAME'] == 'openvox' || ENV['OPENVOX_GEM_VERSION']
+  gem 'openvox', ENV['CI_PUPPET_GEM_VERSION'] || ENV['OPENVOX_GEM_VERSION'], :require => false, :groups => [:test]
 else
-  gem 'puppet', ENV.fetch('PUPPET_GEM_VERSION', [">= 7", "< 9"]), :require => false, :groups => [:test]
+  gem 'puppet', ENV['CI_PUPPET_GEM_VERSION'] || ENV.fetch('PUPPET_GEM_VERSION', [">= 7", "< 9"]), :require => false, :groups => [:test]
 end
 
 # vim: syntax=ruby

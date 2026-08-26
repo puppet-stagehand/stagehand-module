@@ -7,6 +7,16 @@
 - feat(platform-lock): add the authoritative role-aware Puppet package contract, exact native package locks, Java/PostgreSQL family guards, desired/observed manifests, interruption recovery, and live-evidence schema
 - feat(stagehand::console::docker): add the container integration consumed by installer-managed Stagehand deployments
 
+## [0.2.3] - 2026-08-21
+
+- fix(tasks): class_enumerate.rb required `english` (lowercase) instead of Ruby stdlib's actual `English` (capital E) file -- silently masked on case-insensitive filesystems (macOS, Windows) but a hard LoadError on every real Linux target, which is this task's actual deployment platform. Caught by running the CI just added against a real Linux runner for the first time; local macOS testing had given false confidence.
+
+## [0.2.2] - 2026-08-21
+
+- fix(console): reorder class parameters so required params precede optional ones (parameter_order lint fix, no behavior change -- Puppet class declarations are always named-parameter, never positional)
+- fix(metadata): shorten summary to fit Forge's 144-char limit (metadata-json-lint now actually runs -- see CI notes)
+- chore(ci): first-ever puppet-lint run against this module; add .puppet-lint.rc (--relative, fixes a false autoloader_layout error from the puppetlabs_spec_helper rake-task invocation path) and auto-fix all pre-existing arrow_alignment warnings
+
 ## [0.2.1] - 2026-08-21
 
 - feat(tasks): add class_enumerate — read-only applied-classes report for the console's ENC discovery/import wizard, ported from puppet-console's pre-split adapters/pcm/ copy (added there post-split, never previously landed here)

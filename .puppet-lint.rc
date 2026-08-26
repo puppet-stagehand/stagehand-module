@@ -15,3 +15,4 @@
 # declaration -- out of scope for CI scaffolding. Re-apply this line after
 # any modulesync sync that touches this file.
 --no-params_empty_string_assignment-check
+--relative

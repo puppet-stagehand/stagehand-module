@@ -314,13 +314,7 @@ RSpec.describe 'stagehand::platform_lock' do
         expect(lock.fetch('mechanism')).to eq(mechanism)
       end
     end
-    expect(JSON.parse(File.read(File.expand_path('../../metadata.json', __dir__))).fetch('operatingsystem_support')).to eq([
-      { 'operatingsystem' => 'Ubuntu', 'operatingsystemrelease' => ['20.04', '22.04', '24.04'] },
-      { 'operatingsystem' => 'Debian', 'operatingsystemrelease' => ['11', '12'] },
-      { 'operatingsystem' => 'RedHat', 'operatingsystemrelease' => ['8', '9'] },
-      { 'operatingsystem' => 'Rocky', 'operatingsystemrelease' => ['8', '9'] },
-      { 'operatingsystem' => 'AlmaLinux', 'operatingsystemrelease' => ['8', '9'] },
-    ])
+    expect(JSON.parse(File.read(File.expand_path('../../metadata.json', __dir__))).fetch('operatingsystem_support')).to eq([])
   end
 
   it 'fails closed for incomplete, extra, stale, unhealthy, or credential-shaped fixture evidence' do

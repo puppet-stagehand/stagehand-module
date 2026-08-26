@@ -9,6 +9,30 @@ ENV['COVERAGE'] ||= 'yes' if Dir.exist?(File.expand_path('../lib', __dir__))
 
 require 'voxpupuli/test/spec_helper'
 
+module StagehandExplicitTestFacts
+  TEST_PLATFORM_MATRIX = [
+    {
+      'operatingsystem' => 'Ubuntu',
+      'operatingsystemrelease' => ['24.04'],
+    },
+    {
+      'operatingsystem' => 'RedHat',
+      'operatingsystemrelease' => ['9'],
+    },
+  ].freeze
+
+  # Public support metadata is evidence-gated and intentionally empty until
+  # all required live identities pass. Catalog specs still need deterministic
+  # release-intent facts without turning test coverage into a support claim.
+  def on_supported_os(opts = {})
+    explicit = opts.dup
+    explicit[:supported_os] = TEST_PLATFORM_MATRIX unless explicit.key?(:supported_os)
+    super(explicit)
+  end
+end
+
+RspecPuppetFacts.prepend(StagehandExplicitTestFacts)
+
 RSpec.configure do |c|
   c.facterdb_string_keys = false
 end

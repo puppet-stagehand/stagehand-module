@@ -7,6 +7,9 @@ permanent home**; `puppet-installer` vendors it directly by git URL and tag,
 pinned in its own `vendor.yaml` and fetched by its `scripts/vendor-modules.sh`
 (no Puppetfile/r10k involved) — see that repo's own docs for the exact pin.
 
+See [`RELEASE.md`](RELEASE.md) for the CI/security-scan gates and the release
+process — read it before cutting a tag.
+
 ## Classes
 
 - **`stagehand::platform_lock`** — consumes one installer-selected entry from
@@ -173,13 +176,11 @@ service-specific major-family guards so routine security patches remain
 available.
 
 Repository availability is not platform-lock support evidence. The module-wide
-`metadata.json` support list continues to describe the already-tested Stagehand
-classes; it does not promote a platform-lock tuple. A lock tuple is supported
-only after schema-valid live evidence proves native locking, service runtime,
-catalog/report, and interruption recovery for that exact contract tuple. The
-initial approved release set is deliberately `unvalidated`, and the SLES and
-Windows adapters are not added to module support metadata merely because they
-compile.
+`metadata.json` support list remains empty until schema-valid live evidence
+proves native locking, service runtime, catalog/report, and interruption
+recovery for every required identity in an exact contract tuple. The initial
+approved release set is deliberately `unvalidated`; compile-only coverage does
+not promote Debian, RedHat-family, SLES, or Windows support claims.
 See the Puppet Stagehand operator documentation for the per-role package table,
 drift diagnosis, and controlled unlock/upgrade/relock procedure.
 

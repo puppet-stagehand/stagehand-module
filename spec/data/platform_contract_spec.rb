@@ -221,13 +221,7 @@ RSpec.describe 'platform contract support evidence application' do
   end
 
   it 'keeps Stagehand specs runnable with explicit platform-lock facts without changing module support claims' do
-    expect(JSON.parse(File.read(source_metadata)).fetch('operatingsystem_support')).to eq([
-      { 'operatingsystem' => 'Ubuntu', 'operatingsystemrelease' => ['20.04', '22.04', '24.04'] },
-      { 'operatingsystem' => 'Debian', 'operatingsystemrelease' => ['11', '12'] },
-      { 'operatingsystem' => 'RedHat', 'operatingsystemrelease' => ['8', '9'] },
-      { 'operatingsystem' => 'Rocky', 'operatingsystemrelease' => ['8', '9'] },
-      { 'operatingsystem' => 'AlmaLinux', 'operatingsystemrelease' => ['8', '9'] },
-    ])
+    expect(JSON.parse(File.read(source_metadata)).fetch('operatingsystem_support')).to eq([])
     expect(on_supported_os).not_to be_empty
     expect(on_supported_os.keys).to include('ubuntu-24.04-x86_64', 'redhat-9-x86_64')
   end
