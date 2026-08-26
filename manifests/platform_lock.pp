@@ -122,9 +122,7 @@ class stagehand::platform_lock (
     }
     $server_java_home = $server_runtime['java_home'] ? {
       undef   => $facts['os']['family'] ? {
-        # lint:ignore:legacy_facts
-        'Debian' => "/usr/lib/jvm/java-21-openjdk-${facts['architecture']}",
-        # lint:endignore
+        'Debian' => "/usr/lib/jvm/java-21-openjdk-${facts['os']['architecture']}",
         default  => '/usr/lib/jvm/java-21-openjdk',
       },
       default => $server_runtime['java_home'],
@@ -141,9 +139,7 @@ class stagehand::platform_lock (
     }
     $puppetdb_java_home = $puppetdb_runtime['java_home'] ? {
       undef   => $facts['os']['family'] ? {
-        # lint:ignore:legacy_facts
-        'Debian' => "/usr/lib/jvm/java-17-openjdk-${facts['architecture']}",
-        # lint:endignore
+        'Debian' => "/usr/lib/jvm/java-17-openjdk-${facts['os']['architecture']}",
         default  => '/usr/lib/jvm/java-17-openjdk',
       },
       default => $puppetdb_runtime['java_home'],
@@ -288,10 +284,15 @@ class stagehand::platform_lock (
       $ordered_packages = $entry['packages'].map |Hash $package| { $package['name'] }.sort.map |String $name| {
         $entry['packages'].filter |Hash $package| { $package['name'] == $name }[0]
       }
+      $canonical_runtime = $role_name ? {
+        'puppet_server' => $entry['runtime'] + { 'java_home' => $server_java_home },
+        'puppetdb'      => $entry['runtime'] + { 'java_home' => $puppetdb_java_home },
+        default         => $entry['runtime'],
+      }
       $canonical_role = {
         'role'     => $role_name,
         'packages' => $ordered_packages,
-        'runtime'  => $entry['runtime'],
+        'runtime'  => $canonical_runtime,
       }
       $canonical_role
     }
@@ -306,9 +307,7 @@ class stagehand::platform_lock (
         'family'       => downcase($facts['os']['family']),
         'name'         => $facts['os']['name'],
         'version'      => $facts['os']['release']['full'],
-        # lint:ignore:legacy_facts
-        'architecture' => $facts['architecture'],
-        # lint:endignore
+        'architecture' => $facts['os']['architecture'],
       },
     }
     $generation_json = inline_template('<% require "json"; canonical = lambda { |value| value.is_a?(Hash) ? value.keys.sort.each_with_object({}) { |key, out| out[key] = canonical.call(value[key]) } : (value.is_a?(Array) ? value.map { |item| canonical.call(item) } : value) }; %><%= JSON.generate(canonical.call(@generation_projection)) %>')

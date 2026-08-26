@@ -8,7 +8,7 @@ require 'tmpdir'
 RSpec.describe 'stagehand::platform_lock' do
   let(:facts) do
     {
-      'os' => { 'family' => 'Debian', 'name' => 'Ubuntu', 'release' => { 'major' => '24.04', 'full' => '24.04' } },
+      'os' => { 'family' => 'Debian', 'name' => 'Ubuntu', 'architecture' => 'amd64', 'release' => { 'major' => '24.04', 'full' => '24.04' } },
       'architecture' => 'amd64',
       'networking' => { 'fqdn' => 'core.example.test' },
     }
@@ -202,6 +202,18 @@ RSpec.describe 'stagehand::platform_lock' do
     it { is_expected.to contain_file('/etc/systemd/system/puppetdb.service.d/20-stagehand-java.conf').with_content(%r{JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64}) }
     it { is_expected.to contain_exec('stagehand-platform-lock-restart-puppetserver').with(command: '/bin/systemctl try-restart puppetserver', refreshonly: true) }
     it { is_expected.to contain_exec('stagehand-platform-lock-restart-puppetdb').with(command: '/bin/systemctl try-restart puppetdb', refreshonly: true) }
+
+    context 'when the approved contract supplies only Java majors' do
+      let(:facts) { super().reject { |key, _value| key == 'architecture' } }
+      let(:params) do
+        server = server_role.merge('runtime' => { 'java_major' => 21 })
+        database = puppetdb_role.merge('runtime' => { 'java_major' => 17, 'postgresql_major' => 17 })
+        super().merge('roles' => [server, database])
+      end
+
+      it { is_expected.to contain_file('/etc/systemd/system/puppetserver.service.d/20-stagehand-java.conf').with_content(%r{JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64}) }
+      it { is_expected.to contain_file('/etc/systemd/system/puppetdb.service.d/20-stagehand-java.conf').with_content(%r{JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64}) }
+    end
 
     context 'with an unsafe JAVA_HOME' do
       let(:params) do

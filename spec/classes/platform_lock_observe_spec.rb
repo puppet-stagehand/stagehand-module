@@ -9,7 +9,7 @@ require 'tmpdir'
 RSpec.describe 'stagehand::platform_lock' do
   let(:facts) do
     {
-      'os' => { 'family' => 'Debian', 'name' => 'Ubuntu', 'release' => { 'major' => '24.04', 'full' => '24.04' } },
+      'os' => { 'family' => 'Debian', 'name' => 'Ubuntu', 'architecture' => 'amd64', 'release' => { 'major' => '24.04', 'full' => '24.04' } },
       'architecture' => 'amd64',
       'networking' => { 'fqdn' => 'core.example.test' },
     }
@@ -58,6 +58,28 @@ RSpec.describe 'stagehand::platform_lock' do
   def desired_document
     encoded = helper_content[/Base64\.strict_decode64\('([A-Za-z0-9+\/=]+)'\)/, 1]
     JSON.parse(Base64.strict_decode64(encoded))
+  end
+
+  it 'normalizes derived Java homes into the immutable desired snapshot' do
+    homes = desired_document.fetch('desired').fetch('roles').filter_map { |role| role.dig('runtime', 'java_home') }
+    expect(homes).to contain_exactly('/usr/lib/jvm/java-21-openjdk-amd64', '/usr/lib/jvm/java-17-openjdk-amd64')
+  end
+
+  context 'when the approved contract supplies only Java majors' do
+    let(:facts) { super().reject { |key, _value| key == 'architecture' } }
+    let(:params) do
+      roles = super().fetch('roles').map do |role|
+        next role unless %w[puppet_server puppetdb].include?(role.fetch('role'))
+
+        role.merge('runtime' => role.fetch('runtime').reject { |key, _value| key == 'java_home' })
+      end
+      super().merge('roles' => roles)
+    end
+
+    it 'persists concrete Java homes derived from structured OS facts' do
+      homes = desired_document.fetch('desired').fetch('roles').filter_map { |role| role.dig('runtime', 'java_home') }
+      expect(homes).to contain_exactly('/usr/lib/jvm/java-21-openjdk-amd64', '/usr/lib/jvm/java-17-openjdk-amd64')
+    end
   end
 
   def collector_for(desired, recompute: true)
