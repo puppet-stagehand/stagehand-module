@@ -14,7 +14,26 @@ set -u
 
 say() { printf '>>> %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-fail_json() { printf '{"status": "error", "error": "%s"}\n' "$*"; exit 0; }
+
+RUBY="${STAGEHAND_RECERT_RUBY_BIN:-}"
+if [ -z "$RUBY" ]; then
+  if [ -x /opt/puppetlabs/puppet/bin/ruby ]; then
+    RUBY=/opt/puppetlabs/puppet/bin/ruby
+  else
+    RUBY=ruby
+  fi
+fi
+
+if [ -n "${PT__installdir:-}" ] && [ -f "${PT__installdir}/stagehand/files/json_escape.sh" ]; then
+  JSON_HELPER="${PT__installdir}/stagehand/files/json_escape.sh"
+else
+  JSON_HELPER="$(dirname "$0")/../files/json_escape.sh"
+fi
+[ -f "$JSON_HELPER" ] || die "JSON helper not found at $JSON_HELPER"
+# shellcheck disable=SC1090
+. "$JSON_HELPER"
+
+fail_json() { printf '{"status": "error", "error": %s}\n' "$(json_escape "$*")"; exit 0; }
 
 # STAGEHAND_RECERT_PUPPET_BIN exists solely so recert_test.sh can point this
 # script at a stub puppet binary on a curated PATH (mirroring
@@ -58,7 +77,7 @@ case "$RC" in
     say "re-cert complete; verifying trusted extensions"
     "$PUPPET" facts show trusted.extensions 1>&2 2>/dev/null || true
     say "old ssl state kept at ${SSLDIR}.recert-${STAMP} — remove after verifying"
-    printf '{"status": "recertified", "ssl_backup": "%s"}\n' "${SSLDIR}.recert-${STAMP}"
+    printf '{"status": "recertified", "ssl_backup": %s}\n' "$(json_escape "${SSLDIR}.recert-${STAMP}")"
     exit 0
     ;;
   1)

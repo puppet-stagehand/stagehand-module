@@ -46,11 +46,13 @@ write_puppet_stub() {
   confdir="$1"
   ssldir="$2"
   agent_rc="$3"
+  printf '%s\n' "$confdir" > "$WORK/stub-confdir"
+  printf '%s\n' "$ssldir" > "$WORK/stub-ssldir"
   cat > "$SHIMDIR/puppet" <<SHIM
 #!/bin/sh
 case "\$*" in
-  "config print confdir") printf '%s\n' "$confdir"; exit 0 ;;
-  "config print ssldir") printf '%s\n' "$ssldir"; exit 0 ;;
+  "config print confdir") cat "$WORK/stub-confdir"; exit 0 ;;
+  "config print ssldir") cat "$WORK/stub-ssldir"; exit 0 ;;
   "agent -t --waitforcert 60") exit $agent_rc ;;
   "facts show trusted.extensions") printf 'trusted.extensions: {}\n'; exit 0 ;;
   *) printf 'STUB: unhandled puppet invocation: %s\n' "\$*" >&2; exit 99 ;;
@@ -205,6 +207,26 @@ case "$ERROR7" in
   *) fail "case 7 (mv failure): expected error to mention 'could not move ssldir', got: $ERROR7" ;;
 esac
 info "case 7 (mv failure): OK (embedded JSON error, exit 0)"
+
+# --- Case 8: a Puppet ssldir containing JSON-special characters round-trips
+# through the success payload without corrupting its JSON contract. ---
+reset
+CONFDIR8="$WORK/case8/confdir"
+SSLDIR8=$(printf '%s/case8/ssl"dir\nwith-tab\t' "$WORK")
+mkdir -p "$CONFDIR8" "$SSLDIR8" || fail "case 8 setup: mkdir failed"
+write_puppet_stub "$CONFDIR8" "$SSLDIR8" 0
+PT_challenge='tok-8'
+OUT=$(run_recert)
+RC=$?
+[ "$RC" -eq 0 ] || fail "case 8 (JSON-special ssldir): expected exit 0, got $RC. stdout: $OUT"
+SSL_BACKUP8=$(printf '%s' "$OUT" | jq -er '.ssl_backup' 2>/dev/null) \
+  || fail "case 8 (JSON-special ssldir): output is not valid success JSON: $OUT"
+case "$SSL_BACKUP8" in
+  "${SSLDIR8}.recert-"*) : ;;
+  *) fail "case 8 (JSON-special ssldir): ssl_backup did not round-trip: $SSL_BACKUP8" ;;
+esac
+[ -d "$SSL_BACKUP8" ] || fail "case 8 (JSON-special ssldir): backup directory missing: $SSL_BACKUP8"
+info "case 8 (JSON-special ssldir): OK (valid JSON, path round-trips)"
 
 info "all recert.sh safety cases PASSED"
 exit 0
