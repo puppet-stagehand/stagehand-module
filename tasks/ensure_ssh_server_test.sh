@@ -90,7 +90,21 @@ exit 1
 SHIM
 chmod +x "$SHIMDIR/systemctl"
 
-TEST_PATH="$SHIMDIR:/usr/bin:/bin:/usr/sbin:/sbin"
+# Real coreutils ensure_ssh_server.sh needs regardless of which
+# package-manager case is under test (mktemp/tail/tr for its LOG/die()
+# handling; rm for cleanup). Symlinked into SHIMDIR itself -- rather than
+# appending real system dirs (/usr/bin, /bin, ...) to TEST_PATH -- so that
+# a case which removes a package-manager stub (e.g. "rm -f
+# $SHIMDIR/apt-get" to simulate an apt-get-less host) genuinely makes that
+# command unresolvable. Ubuntu/Debian CI runners have a real /usr/bin/
+# apt-get; appending system dirs to PATH let it leak through and defeated
+# the simulated-absence cases entirely.
+for real_bin in sh mktemp tail tr rm; do
+  real_path=$(command -v "$real_bin") || fail "required real binary not found: $real_bin"
+  ln -s "$real_path" "$SHIMDIR/$real_bin" || fail "could not symlink $real_bin into shim dir"
+done
+
+TEST_PATH="$SHIMDIR"
 
 run() {
   PATH="$TEST_PATH" \
