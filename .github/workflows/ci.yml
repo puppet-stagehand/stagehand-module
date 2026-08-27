@@ -227,15 +227,20 @@ jobs:
   # reusable beaker.yml generates zero acceptance matrix legs per
   # collection, so its "Test suite" sub-job always reports failure/skip --
   # not a real regression, just a structurally-empty job. `continue-on-error`
-  # here mirrors the exact treatment already applied to `openvox9-beta`
-  # below: keep the job wired in (so it starts reporting real green/red the
-  # moment the platform-lock contract is legitimately promoted out of `[]`
-  # via apply-platform-support-evidence.sh, no workflow edit required at
-  # that point) without letting its structurally-guaranteed failure block
-  # this workflow's overall result. Decision: human call, 2026-08-27 (see
-  # pcm phase 04.1 stagehand.json ci_remediation escalation) -- option A
-  # (accept legs as non-required), explicitly NOT touching metadata.json or
-  # the platform-lock contract tests.
+  # is NOT valid on a job that `uses:` a reusable workflow (GitHub Actions
+  # rejects it at parse time), so this mirrors the exact treatment already
+  # applied to `openvox9-beta` below instead: leave the calling job itself
+  # unmodified and add a trailing `-gate` job (`if: always()`) that always
+  # succeeds and reports the underlying result. Keep the job wired in (so
+  # it starts reporting real green/red the moment the platform-lock
+  # contract is legitimately promoted out of `[]` via
+  # apply-platform-support-evidence.sh, no workflow edit required at that
+  # point) and treat only `package-resolution-gate` -- not the raw
+  # `package-resolution` / Test suite legs -- as a required check.
+  # Decision: human call, 2026-08-27 (see pcm phase 04.1 stagehand.json
+  # ci_remediation escalation) -- option A (accept legs as non-required),
+  # explicitly NOT touching metadata.json or the platform-lock contract
+  # tests.
   package-resolution:
     name: ${{ matrix.collection }} dependency resolution
     strategy:
@@ -246,7 +251,6 @@ jobs:
           - puppet8
           - openvox8
     uses: voxpupuli/gha-puppet/.github/workflows/beaker.yml@v4
-    continue-on-error: true
     with:
       beaker_staging_url: ${{ inputs.beaker_staging_url }}
       beaker_collection: ${{ inputs.beaker_collection || matrix.collection }}
