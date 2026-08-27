@@ -126,9 +126,9 @@ jobs:
               ;;
             dnf)
               dnf install -y -q curl
-              ELV=$(rpm -E %{rhel} 2>/dev/null || true)
+              ELV=$(rpm -E '%{rhel}' 2>/dev/null || true)
               case "$ELV" in
-                ''|*%*) echo "::error::cannot determine EL major via rpm -E %{rhel}"; exit 1 ;;
+                ''|*%*) echo "::error::cannot determine EL major via rpm -E '%{rhel}'"; exit 1 ;;
               esac
               echo ">>> adding puppetcore yum repo (el${ELV}, puppet9)"
               rpm -Uvh "https://yum-puppetcore.puppet.com/public/puppet9-release-el-${ELV}.noarch.rpm"

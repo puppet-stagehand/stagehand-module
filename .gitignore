@@ -1,2 +1,5 @@
 /spec/fixtures/
 /Gemfile.lock
+/.yardoc/
+/pkg/
+.DS_Store

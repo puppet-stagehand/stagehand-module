@@ -149,6 +149,65 @@ jobs:
           done
           exit "$status"
 
+  # FORGE-01: `pdk build` packages metadata.json + the module's declared
+  # files into an installable tarball independent of `pdk validate`'s
+  # compatibility gate. `pdk validate` is NOT wired in here -- it
+  # unconditionally fails with "This module is not PDK compatible" against
+  # this repo's voxpupuli/modulesync toolchain (Gemfile/Rakefile), and
+  # `pdk convert --force` destroys that working toolchain (same documented,
+  # shared gap as puppet-stagehand/patchbot, trivy, and openscap -- see
+  # 04.1-03/04/05-SUMMARY.md). Inspects the resulting tarball's name/
+  # version/file manifest so a malformed or incomplete package fails CI
+  # instead of only surfacing at publish time.
+  pdk-build-and-package:
+    name: PDK build + package inspection (FORGE-01)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: pdk build
+        run: pdk build --force
+
+      - name: Inspect built package (name, version, expected file manifest)
+        run: |
+          set -eu
+          name=$(jq -r '.name' metadata.json)
+          version=$(jq -r '.version' metadata.json)
+          pkg="pkg/${name}-${version}.tar.gz"
+          [ -f "$pkg" ] || { echo "::error::expected package not found: $pkg"; exit 1; }
+          echo ">>> package: $pkg"
+          sha256sum "$pkg"
+          echo ">>> manifest:"
+          tar tzf "$pkg" | sed -n '1,50p'
+          tar tzf "$pkg" | grep -q "${name}-${version}/metadata.json" \
+            || { echo "::error::package is missing metadata.json at its expected path"; exit 1; }
+          tar tzf "$pkg" | grep -q "${name}-${version}/manifests/console_integration.pp" \
+            || { echo "::error::package is missing manifests/console_integration.pp"; exit 1; }
+          tar tzf "$pkg" | grep -q "${name}-${version}/tasks/recert.json" \
+            || { echo "::error::package is missing tasks/recert.json"; exit 1; }
+          tar tzf "$pkg" | grep -q "${name}-${version}/files/json_escape.sh" \
+            || { echo "::error::package is missing files/json_escape.sh"; exit 1; }
+
+  # POLISH-03: REFERENCE.md must be generated, committed, and never allowed
+  # to silently drift from the manifests/tasks/functions it documents.
+  reference-drift:
+    name: REFERENCE.md drift gate (POLISH-03)
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Regenerate REFERENCE.md and fail on drift
+        run: |
+          bundle exec puppet strings generate --format markdown
+          git diff --exit-code -- REFERENCE.md
+
   package-resolution:
     name: ${{ matrix.collection }} dependency resolution
     strategy:
