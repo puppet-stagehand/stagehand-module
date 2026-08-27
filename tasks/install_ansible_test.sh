@@ -237,6 +237,46 @@ case "$OUT" in
 esac
 info "case (i) unknown method with quote: OK (valid JSON, quote/backslash escaped)"
 
+# --- Case (i2): unknown install_method containing JSON control characters ->
+# the catch-all branch preserves the value and still emits valid JSON. ---
+reset
+UNKNOWN_METHOD=$(printf 'foo\nbar\tqux')
+OUT=$(
+  STAGEHAND_SOURCED=1
+  export STAGEHAND_SOURCED
+  STAGEHAND_ANSIBLE_BIN="$ANSIBLE_TARGET"
+  export STAGEHAND_ANSIBLE_BIN
+  # shellcheck disable=SC1090
+  . "$INSTALL_SH"
+  install_ansible_run "$UNKNOWN_METHOD"
+)
+PARSED_METHOD=$(printf '%s' "$OUT" | ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("method")' 2>/dev/null) \
+  || fail "case (i2) unknown method with controls: emitted fragment is not valid JSON: $OUT"
+[ "$PARSED_METHOD" = "$UNKNOWN_METHOD" ] \
+  || fail "case (i2) unknown method with controls: method did not round-trip exactly"
+info "case (i2) unknown method with controls: OK (valid JSON, value round-trips)"
+
+# --- Case (i3): the ansible-present fast path must encode arbitrary sourced
+# input just as safely as the catch-all branch. ---
+reset
+: > "$ANSIBLE_TARGET"
+chmod +x "$ANSIBLE_TARGET"
+PRESENT_METHOD=$(printf 'present"method\nwith\tcontrols\\tail')
+OUT=$(
+  STAGEHAND_SOURCED=1
+  export STAGEHAND_SOURCED
+  STAGEHAND_ANSIBLE_BIN="$ANSIBLE_TARGET"
+  export STAGEHAND_ANSIBLE_BIN
+  # shellcheck disable=SC1090
+  . "$INSTALL_SH"
+  install_ansible_run "$PRESENT_METHOD"
+)
+PARSED_METHOD=$(printf '%s' "$OUT" | ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("method")' 2>/dev/null) \
+  || fail "case (i3) present fast path: emitted fragment is not valid JSON: $OUT"
+[ "$PARSED_METHOD" = "$PRESENT_METHOD" ] \
+  || fail "case (i3) present fast path: method did not round-trip exactly"
+info "case (i3) present fast path: OK (valid JSON, value round-trips)"
+
 # --- Case (j): STAGEHAND_RUBY_BIN override is honored by the standalone entry
 # point's install_method JSON parse. ---
 reset

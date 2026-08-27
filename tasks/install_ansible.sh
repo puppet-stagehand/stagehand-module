@@ -47,6 +47,18 @@ if [ -z "${RUBY:-}" ]; then
   fi
 fi
 
+# The encoder is a staged task file in Bolt and a repository sibling in the
+# direct shell harnesses. run_playbook.sh also lists it explicitly because
+# Bolt does not recursively stage files declared by install_ansible.json.
+if [ -n "${PT__installdir:-}" ] && [ -f "${PT__installdir}/stagehand/files/json_escape.sh" ]; then
+  JSON_HELPER="${PT__installdir}/stagehand/files/json_escape.sh"
+else
+  JSON_HELPER="$(dirname "$0")/../files/json_escape.sh"
+fi
+[ -f "$JSON_HELPER" ] || die "JSON helper not found at $JSON_HELPER"
+# shellcheck disable=SC1090
+. "$JSON_HELPER"
+
 # install_ansible_run METHOD
 #
 # Ensures ansible-playbook is available per METHOD; prints a single JSON
@@ -58,7 +70,7 @@ install_ansible_run() {
   method="${1:-auto}"
 
   if command -v "$ANSIBLE_BIN" >/dev/null 2>&1; then
-    printf '{"method": "%s", "status": "ok"}' "$method"
+    printf '{"method": %s, "status": "ok"}' "$(json_escape "$method")"
     return 0
   fi
 
@@ -112,15 +124,13 @@ install_ansible_run() {
       if [ -z "$_pm" ]; then
         _reason="no package manager (apt-get/dnf/yum/zypper) or pip found on PATH — task PATH may be minimal (PATH=$PATH)"
       else
-        # last ~600 bytes of captured output, sanitized to a JSON-safe string
-        # (strip control chars, drop quotes/backslashes) so the real apt/pip
-        # error rides back in the run record without breaking the JSON contract.
-        _tail=$(tail -c 600 "$_log" 2>/dev/null | tr '\n' ' ' | tr -d '\000-\037' | tr '"\\' '  ')
+        # Keep the diagnostic on one line; json_escape below preserves quotes
+        # and backslashes safely instead of deleting them from the message.
+        _tail=$(tail -c 600 "$_log" 2>/dev/null | tr '\n' ' ' | tr -d '\000-\037')
         _reason="install via ${_pm} did not yield ansible-playbook: ${_tail}"
       fi
       rm -f "$_log"
-      _reason=$(printf '%s' "$_reason" | tr -d '\000-\037' | tr '"\\' '  ')
-      printf '{"method": "auto", "status": "error", "error": "%s"}' "$_reason"
+      printf '{"method": "auto", "status": "error", "error": %s}' "$(json_escape "$_reason")"
       return 1
       ;;
     package)
@@ -202,14 +212,10 @@ install_ansible_run() {
       return 1
       ;;
     *)
-      # $method is unvalidated, operator-controlled input reaching this
-      # branch — unlike every other case above, which is a case-matched
-      # literal string safe to embed as-is. Escape it before interpolating
-      # into hand-rolled JSON (WR-02) so a method containing `"` or `\`
-      # can't produce malformed output.
-      escaped_method=$(printf '%s' "$method" | sed 's/["\\]/\\&/g')
-      printf '{"method": "%s", "status": "error", "error": "unknown install_method %s"}' \
-        "$escaped_method" "$escaped_method"
+      # $method is unvalidated, operator-controlled input in direct/sourced
+      # use, so encode both occurrences with the same complete JSON encoder.
+      printf '{"method": %s, "status": "error", "error": %s}' \
+        "$(json_escape "$method")" "$(json_escape "unknown install_method $method")"
       return 1
       ;;
   esac
