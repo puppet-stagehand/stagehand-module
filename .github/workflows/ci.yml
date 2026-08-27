@@ -124,7 +124,12 @@ jobs:
           bundle install --jobs 4 --retry 3
 
       - name: rspec-puppet
-        run: bundle exec rake spec_prep spec:standalone
+        # fixtures:prep (not the modulesync-managed spec_prep shim, which
+        # only mkdir's spec/fixtures -- it doesn't fetch anything) is the
+        # real task in this voxpupuli-test/puppet_fixtures toolchain that
+        # installs .fixtures.yml's declared Forge modules (stdlib/docker/
+        # apt/yumrepo_core), matching what a clean CI checkout actually needs.
+        run: bundle exec rake fixtures:prep spec:standalone
 
   task-tests:
     name: Bolt task shell tests

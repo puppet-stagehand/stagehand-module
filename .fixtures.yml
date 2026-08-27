@@ -21,5 +21,3 @@ fixtures:
     yumrepo_core:
       repo: puppetlabs/yumrepo_core
       ref: '3.0.1'
-  symlinks:
-    stagehand: "#{source_dir}"
