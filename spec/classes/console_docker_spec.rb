@@ -1,18 +1,20 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 # Covers stagehand::console::docker -- the container-lifecycle sibling of
 # stagehand::console (see console_spec.rb).
 describe 'stagehand::console::docker' do
   let(:valid_image_ref) do
-    'ghcr.io/puppet-stagehand/console@sha256:' + ('a' * 64)
+    "ghcr.io/puppet-stagehand/console@sha256:#{'a' * 64}"
   end
 
   let(:required_params) do
     {
-      'image_ref'          => valid_image_ref,
-      'db_password'        => sensitive('s3cr3t-db-password'),
-      'ingest_token'       => sensitive('s3cr3t-ingest-token'),
-      'dataservice_token'  => sensitive('s3cr3t-dataservice-token'),
+      'image_ref' => valid_image_ref,
+      'db_password' => sensitive('s3cr3t-db-password'),
+      'ingest_token' => sensitive('s3cr3t-ingest-token'),
+      'dataservice_token' => sensitive('s3cr3t-dataservice-token'),
     }
   end
 
@@ -100,7 +102,7 @@ describe 'stagehand::console::docker' do
         # on Debian, 'postgresql' on RedHat family (covers RedHat/Rocky/
         # AlmaLinux). Declared exactly once regardless of topology branch.
         it 'resolves the correct pg_dump-client package name for this OS family' do
-          expected_package = os_facts[:os]['family'] == 'RedHat' ? 'postgresql' : 'postgresql-client'
+          expected_package = (os_facts[:os]['family'] == 'RedHat') ? 'postgresql' : 'postgresql-client'
           is_expected.to contain_package(expected_package)
         end
       end

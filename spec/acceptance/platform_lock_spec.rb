@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'json'
 require 'open3'
 require 'tmpdir'
@@ -36,13 +38,13 @@ RSpec.describe 'platform lock live evidence' do
     File.write(probe_path, JSON.generate(probe))
     targets_path = File.join(dir, 'targets.json')
     File.write(targets_path, JSON.generate({
-      'schema_version' => 1,
-      'targets' => [{
-        'platform_id' => platform_id,
-        'evidence_kind' => disposition_kind,
-        'command' => ['cat', probe_path],
-      }],
-    }))
+                                             'schema_version' => 1,
+                                             'targets' => [{
+                                               'platform_id' => platform_id,
+                                               'evidence_kind' => disposition_kind,
+                                               'command' => ['cat', probe_path],
+                                             }],
+                                           }))
     targets_path
   end
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 require 'base64'
 require 'json'
@@ -90,6 +92,7 @@ RSpec.describe 'stagehand::platform_lock' do
       let(:params) { super().merge('roles' => [puppetdb_role, server_role]) }
 
       it { is_expected.to compile.with_all_deps }
+
       it 'unions shared packages into one deterministic resource' do
         puppet_package_titles = %w[
           stagehand-platform-lock-puppet-agent
@@ -134,15 +137,15 @@ RSpec.describe 'stagehand::platform_lock' do
       let(:facts) { super().merge('os' => { 'family' => 'windows', 'name' => 'windows', 'release' => { 'major' => '2022', 'full' => '2022' } }, 'architecture' => 'x64') }
       let(:params) do
         super().merge('roles' => [{
-          'role' => 'agent',
-          'packages' => [{
-            'name' => 'puppet-agent',
-            'evr' => '9.0.0',
-            'source' => 'https://downloads.example.test/puppet-agent-9.0.0-x64.msi',
-            'source_sha256' => '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-          }],
-          'runtime' => {},
-        }])
+                        'role' => 'agent',
+                        'packages' => [{
+                          'name' => 'puppet-agent',
+                          'evr' => '9.0.0',
+                          'source' => 'https://downloads.example.test/puppet-agent-9.0.0-x64.msi',
+                          'source_sha256' => '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+                        }],
+                        'runtime' => {},
+                      }])
       end
 
       it { is_expected.to compile.with_all_deps }
@@ -159,11 +162,13 @@ RSpec.describe 'stagehand::platform_lock' do
   context 'invalid role selections fail closed' do
     context 'with no roles' do
       let(:params) { super().merge('roles' => []) }
+
       it { is_expected.to compile.and_raise_error(%r{at least one role}) }
     end
 
     context 'with duplicate roles' do
       let(:params) { super().merge('roles' => [agent_role, agent_role]) }
+
       it { is_expected.to compile.and_raise_error(%r{duplicate role}) }
     end
 
@@ -171,6 +176,7 @@ RSpec.describe 'stagehand::platform_lock' do
       let(:params) do
         super().merge('roles' => [{ 'role' => 'agent', 'packages' => [{ 'name' => 'puppetserver', 'evr' => '9.0.2-1noble' }], 'runtime' => {} }])
       end
+
       it { is_expected.to compile.and_raise_error(%r{package ownership}) }
     end
 
@@ -178,16 +184,19 @@ RSpec.describe 'stagehand::platform_lock' do
       let(:params) do
         super().merge('roles' => [{ 'role' => 'agent', 'packages' => [{ 'name' => 'puppet-agent;id', 'evr' => '9.0.0' }], 'runtime' => {} }])
       end
+
       it { is_expected.to compile.and_raise_error(%r{invalid package identity}) }
     end
 
     context 'on an unsupported OS family' do
       let(:facts) { super().merge('os' => { 'family' => 'Solaris', 'name' => 'Solaris', 'release' => { 'major' => '11', 'full' => '11.4' } }) }
+
       it { is_expected.to compile.and_raise_error(%r{unsupported OS family}) }
     end
 
     context 'with a Windows package lacking immutable source evidence' do
       let(:facts) { super().merge('os' => { 'family' => 'windows', 'name' => 'windows', 'release' => { 'major' => '2022', 'full' => '2022' } }) }
+
       it { is_expected.to compile.and_raise_error(%r{immutable MSI source}) }
     end
   end
@@ -220,6 +229,7 @@ RSpec.describe 'stagehand::platform_lock' do
         unsafe = server_role.merge('runtime' => server_role['runtime'].merge('java_home' => '/tmp/java-21'))
         super().merge('roles' => [unsafe])
       end
+
       it { is_expected.to compile.and_raise_error(%r{invalid JAVA_HOME}) }
     end
   end
@@ -230,6 +240,7 @@ RSpec.describe 'stagehand::platform_lock' do
     it { is_expected.to contain_package('stagehand-platform-lock-postgresql-server').with(name: 'postgresql-17', ensure: 'installed') }
     it { is_expected.to contain_package('stagehand-platform-lock-postgresql-client').with(name: 'postgresql-client-17', ensure: 'installed') }
     it { is_expected.not_to contain_package('stagehand-platform-lock-postgresql-contrib') }
+
     it do
       is_expected.to contain_exec('stagehand-platform-lock-observe-pg-trgm-extension').with(
         command: %r{/usr/sbin/runuser -u postgres -- /usr/bin/psql .*--dbname puppetdb},
@@ -241,6 +252,7 @@ RSpec.describe 'stagehand::platform_lock' do
         role = postgresql_role.merge('runtime' => { 'postgresql_major' => 16 })
         super().merge('roles' => [role])
       end
+
       it { is_expected.to contain_package('stagehand-platform-lock-postgresql-server').with(name: 'postgresql-16', ensure: 'installed') }
     end
 
@@ -249,6 +261,7 @@ RSpec.describe 'stagehand::platform_lock' do
         role = postgresql_role.merge('runtime' => { 'postgresql_major' => 18 })
         super().merge('roles' => [role])
       end
+
       it { is_expected.to compile.and_raise_error(%r{unsupported PostgreSQL major}) }
     end
   end
@@ -270,7 +283,7 @@ RSpec.describe 'stagehand::platform_lock' do
 
     it 'bakes immutable desired identity into the root-owned collector' do
       helper = catalogue.resource('File', '/usr/local/sbin/stagehand-platform-lock-observe')[:content]
-      encoded = helper[/strict_decode64\('([^']+)'\)/, 1]
+      encoded = helper[%r{strict_decode64\('([^']+)'\)}, 1]
       desired = Base64.strict_decode64(encoded)
       expect(desired).to include('core.example.test')
       expect(desired).to include('fe62fe9d17c8aac17f0e1863f679d7d6d329b26272596a4e0451d3de1271aa33')

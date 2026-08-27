@@ -25,6 +25,23 @@ Lint/NonAtomicFileOperation:
   Exclude:
     - 'lib/puppet/functions/stagehand/hiera_data.rb'
 
+# Offense count: 1
+# This cop supports safe autocorrection (--autocorrect).
+RSpec/ExpectActual:
+  Exclude:
+    - '**/spec/routing/**/*'
+    - 'spec/acceptance/platform_lock_spec.rb'
+
+# Offense count: 1
+RSpec/MultipleDescribes:
+  Exclude:
+    - 'spec/data/platform_contract_spec.rb'
+
+# Offense count: 25
+# Configuration parameters: AllowSubject.
+RSpec/MultipleMemoizedHelpers:
+  Max: 7
+
 # Offense count: 15
 # Configuration parameters: AllowedChars.
 # AllowedChars: ©

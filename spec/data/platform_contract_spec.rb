@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'json'
 require 'digest'
 require 'fileutils'
@@ -31,15 +33,15 @@ RSpec.describe 'the approved platform contract' do
     expected_packages = {
       'agent' => ['puppet-agent'],
       'postgresql' => [],
-      'puppet_server' => ['puppet-agent', 'puppetdb-termini', 'puppetserver'],
-      'puppetdb' => ['puppet-agent', 'puppetdb'],
+      'puppet_server' => %w[puppet-agent puppetdb-termini puppetserver],
+      'puppetdb' => %w[puppet-agent puppetdb],
     }
 
     contract.dig('sets', 0, 'tuples').group_by { |tuple| [tuple.fetch('os_family'), tuple.fetch('architecture')] }.each_value do |tuples|
       expect(tuples.map { |tuple| tuple.fetch('role') }.sort).to eq(expected_packages.keys.sort)
       tuples.each do |tuple|
         expect(tuple.fetch('packages').map { |package| package.fetch('name') }).to eq(expected_packages.fetch(tuple.fetch('role')))
-        expect(tuple.fetch('packages')).to all(include('evr' => a_string_matching(/\A\S+\z/)))
+        expect(tuple.fetch('packages')).to all(include('evr' => a_string_matching(%r{\A\S+\z})))
       end
       expect(tuples.find { |tuple| tuple.fetch('role') == 'puppet_server' }.dig('runtime', 'java_major')).to eq(21)
       expect(tuples.find { |tuple| tuple.fetch('role') == 'puppetdb' }.dig('runtime', 'java_major')).to eq(17)
@@ -75,15 +77,14 @@ RSpec.describe 'platform contract support evidence application' do
   let(:source_metadata) { File.join(stagehand_root, 'metadata.json') }
 
   def canonical_json(value)
-    sorted = case value
-             when Hash
-               value.keys.sort.to_h { |key| [key, canonical_json(value.fetch(key))] }
-             when Array
-               value.map { |item| canonical_json(item) }
-             else
-               value
-             end
-    sorted
+    case value
+    when Hash
+      value.keys.sort.to_h { |key| [key, canonical_json(value.fetch(key))] }
+    when Array
+      value.map { |item| canonical_json(item) }
+    else
+      value
+    end
   end
 
   def write_canonical(path, value)
@@ -98,7 +99,7 @@ RSpec.describe 'platform contract support evidence application' do
       '--intent', intent,
       '--contract', contract,
       '--metadata', metadata,
-      '--evidence-dir', evidence,
+      '--evidence-dir', evidence
     )
   end
 
@@ -156,7 +157,7 @@ RSpec.describe 'platform contract support evidence application' do
         { 'operatingsystem' => 'Ubuntu', 'operatingsystemrelease' => ['24.04'] },
       ]
       File.write(metadata_path, "#{JSON.pretty_generate(metadata)}\n")
-      File.delete(Dir.glob(File.join(evidence, 'puppet-core-9-v1/*.json')).sort.first)
+      File.delete(Dir.glob(File.join(evidence, 'puppet-core-9-v1/*.json')).min)
 
       _stdout, _stderr, status = run_updater(contract: contract_path, metadata: metadata_path, evidence: evidence)
       expect(status).not_to be_success
@@ -173,7 +174,7 @@ RSpec.describe 'platform contract support evidence application' do
         artifact['reason_code'] = 'live_probe_passed'
         artifact['probe']['kind'] = 'live'
         artifact.fetch('checks').each_value do |check|
-          check['status'] = check['status'] == 'not_applicable' ? 'not_applicable' : 'pass'
+          check['status'] = (check['status'] == 'not_applicable') ? 'not_applicable' : 'pass'
         end
         expected = artifact.fetch('expected')
         artifact['checks']['ordinary_update']['status'] = expected.fetch('packages').empty? ? 'not_applicable' : 'pass'
@@ -192,9 +193,9 @@ RSpec.describe 'platform contract support evidence application' do
       expect(status).to be_success, "#{stdout}\n#{stderr}"
       expect(JSON.parse(File.read(contract_path)).dig('sets', 0, 'support_disposition')).to eq('supported')
       expect(JSON.parse(File.read(metadata_path)).fetch('operatingsystem_support')).to eq([
-        { 'operatingsystem' => 'Ubuntu', 'operatingsystemrelease' => ['24.04'] },
-        { 'operatingsystem' => 'RedHat', 'operatingsystemrelease' => ['9'] },
-      ])
+                                                                                            { 'operatingsystem' => 'Ubuntu', 'operatingsystemrelease' => ['24.04'] },
+                                                                                            { 'operatingsystem' => 'RedHat', 'operatingsystemrelease' => ['9'] },
+                                                                                          ])
     end
   end
 
@@ -212,7 +213,7 @@ RSpec.describe 'platform contract support evidence application' do
         '--intent', invalid_intent,
         '--contract', contract_path,
         '--metadata', metadata_path,
-        '--evidence-dir', evidence,
+        '--evidence-dir', evidence
       )
       expect(status).not_to be_success
       expect(File.binread(contract_path)).to eq(contract_before)

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 require 'base64'
 require 'digest'
@@ -12,6 +14,30 @@ RSpec.describe 'stagehand::platform_lock' do
       'os' => { 'family' => 'Debian', 'name' => 'Ubuntu', 'architecture' => 'amd64', 'release' => { 'major' => '24.04', 'full' => '24.04' } },
       'architecture' => 'amd64',
       'networking' => { 'fqdn' => 'core.example.test' },
+    }
+  end
+  let(:complete_fixture) do
+    {
+      'healthy' => true,
+      'repository_track' => 9,
+      'packages' => {
+        'puppet-agent' => '9.0.0-1noble',
+        'puppetdb' => '9.0.1-1noble',
+        'puppetdb-termini' => '9.0.1-1noble',
+        'puppetserver' => '9.0.2-1noble',
+      },
+      'native_lock_output' => "puppet-agent\npuppetdb\npuppetdb-termini\npuppetserver\n",
+      'java' => {
+        'puppet_server' => { 'path' => '/usr/lib/jvm/java-21-openjdk-amd64', 'major' => 21 },
+        'puppetdb' => { 'path' => '/usr/lib/jvm/java-17-openjdk-amd64', 'major' => 17 },
+      },
+      'postgresql' => {
+        'packages' => {
+          'postgresql-17' => '17.5-1',
+          'postgresql-client-17' => '17.5-1',
+        },
+        'pg_trgm_extversion' => '1.6',
+      },
     }
   end
   let(:params) do
@@ -56,7 +82,7 @@ RSpec.describe 'stagehand::platform_lock' do
   end
 
   def desired_document
-    encoded = helper_content[/Base64\.strict_decode64\('([A-Za-z0-9+\/=]+)'\)/, 1]
+    encoded = helper_content[%r{Base64\.strict_decode64\('([A-Za-z0-9+/=]+)'\)}, 1]
     JSON.parse(Base64.strict_decode64(encoded))
   end
 
@@ -93,7 +119,7 @@ RSpec.describe 'stagehand::platform_lock' do
     projection = document.fetch('desired').reject { |key, _value| key == 'desired_generation_sha256' }
     document['desired']['desired_generation_sha256'] = Digest::SHA256.hexdigest(JSON.generate(canonical(projection))) if recompute
     encoded = Base64.strict_encode64(JSON.generate(document))
-    helper_content.sub(/(?<=Base64\.strict_decode64\(')[A-Za-z0-9+\/=]+/, encoded)
+    helper_content.sub(%r{(?<=Base64\.strict_decode64\(')[A-Za-z0-9+/=]+}, encoded)
   end
 
   def run_collector(root, fixture, content: helper_content, raw_fixture: nil)
@@ -112,31 +138,6 @@ RSpec.describe 'stagehand::platform_lock' do
       RbConfig.ruby,
       script,
     )
-  end
-
-  let(:complete_fixture) do
-    {
-      'healthy' => true,
-      'repository_track' => 9,
-      'packages' => {
-        'puppet-agent' => '9.0.0-1noble',
-        'puppetdb' => '9.0.1-1noble',
-        'puppetdb-termini' => '9.0.1-1noble',
-        'puppetserver' => '9.0.2-1noble',
-      },
-      'native_lock_output' => "puppet-agent\npuppetdb\npuppetdb-termini\npuppetserver\n",
-      'java' => {
-        'puppet_server' => { 'path' => '/usr/lib/jvm/java-21-openjdk-amd64', 'major' => 21 },
-        'puppetdb' => { 'path' => '/usr/lib/jvm/java-17-openjdk-amd64', 'major' => 17 },
-      },
-      'postgresql' => {
-        'packages' => {
-          'postgresql-17' => '17.5-1',
-          'postgresql-client-17' => '17.5-1',
-        },
-        'pg_trgm_extversion' => '1.6',
-      },
-    }
   end
 
   def rpm_agent_desired(package_name = 'puppetdb', evr = '0:9.0.1-1.el9.noarch')
@@ -208,14 +209,14 @@ RSpec.describe 'stagehand::platform_lock' do
     failures = {
       'termini-only' => wrap.call(termini),
       'duplicate exact' => wrap.call(exact + exact),
-      'alternate edition' => wrap.call(exact + '<solvable kind="package" name="puppetdb" edition="0:9.0.2-1.sles15" arch="noarch"/>'),
+      'alternate edition' => wrap.call("#{exact}<solvable kind=\"package\" name=\"puppetdb\" edition=\"0:9.0.2-1.sles15\" arch=\"noarch\"/>"),
       'epoch mismatch' => wrap.call('<solvable kind="package" name="puppetdb" edition="1:9.0.1-1.sles15" arch="noarch"/>'),
       'architecture mismatch' => wrap.call('<solvable kind="package" name="puppetdb" edition="0:9.0.1-1.sles15" arch="x86_64"/>'),
       'header-only' => wrap.call(''),
       'malformed relevant' => wrap.call('<solvable kind="package" name="puppetdb" edition="0:9.0.1-1.sles15"/>'),
       'similar name' => wrap.call('<solvable kind="package" name="puppetdb-extra" edition="0:9.0.1-1.sles15" arch="noarch"/>'),
       'malformed XML' => '<stream><locks>',
-      'multiple roots' => wrap.call(exact) + '<stream/>',
+      'multiple roots' => "#{wrap.call(exact)}<stream/>",
     }
     failures.each do |label, output|
       Dir.mktmpdir("stagehand-zypper-#{label}") do |root|
@@ -255,7 +256,7 @@ RSpec.describe 'stagehand::platform_lock' do
   end
 
   it 'binds the desired generation to the complete canonical projection' do
-    embedded = helper_content[/Base64\.strict_decode64\('([A-Za-z0-9+\/=]+)'\)/, 1]
+    embedded = helper_content[%r{Base64\.strict_decode64\('([A-Za-z0-9+/=]+)'\)}, 1]
     desired = JSON.parse(Base64.strict_decode64(embedded)).fetch('desired')
     generation = desired.delete('desired_generation_sha256')
     expect(generation).to eq(Digest::SHA256.hexdigest(JSON.generate(canonical(desired))))
@@ -276,23 +277,25 @@ RSpec.describe 'stagehand::platform_lock' do
       expect(File.binread(File.join(root, 'observed.json'))).to eq(prior)
       failure = JSON.parse(File.read(File.join(root, 'collection-failure.json')))
       expect(failure.dig('failure', 'status')).to eq('failed')
-      expect(failure.dig('failure', 'desired_generation_sha256')).to match(/\A[0-9a-f]{64}\z/)
+      expect(failure.dig('failure', 'desired_generation_sha256')).to match(%r{\A[0-9a-f]{64}\z})
     end
   end
 
   it 'contains fixed native probes and bounded atomic publication' do
     helper = helper_content
-    expect(helper).to include("Open3.capture3(*argv)")
+    expect(helper).to include('Open3.capture3(*argv)')
     expect(helper).to include("'/usr/bin/dpkg-query'")
     expect(helper).to include("'/usr/bin/apt-mark'")
     expect(helper).to include("'/usr/sbin/runuser', '-u', 'postgres'")
+    # rubocop:disable Lint/InterpolationCheck -- matching the literal Ruby
+    # source text emitted by the generated helper script, not interpolating.
     expect(helper).to include('postgresql@#{postgres_major}-main')
+    # rubocop:enable Lint/InterpolationCheck
     expect(helper).to include('Timeout.timeout(15)')
     expect(helper).to include('file.fsync')
     expect(helper).to include('File.rename')
-    expect(helper).not_to match(/system\(|`|IO\.popen/)
+    expect(helper).not_to match(%r{system\(|`|IO\.popen})
   end
-
 
   it 'emits exactly the observations owned by each role set' do
     base = desired_document.fetch('desired')
@@ -325,7 +328,7 @@ RSpec.describe 'stagehand::platform_lock' do
     families = { 'debian' => 'apt', 'redhat' => 'rpm', 'sles' => 'zypper', 'windows' => 'windows' }
     agent = { 'role' => 'agent', 'packages' => [{ 'name' => 'puppet-agent', 'evr' => '9.0.0' }], 'runtime' => {} }
     families.each do |family, mechanism|
-      desired = base.merge('roles' => [agent], 'os' => base.fetch('os').merge('family' => family))
+      base.merge('roles' => [agent], 'os' => base.fetch('os').merge('family' => family))
       native_output = case family
                       when 'debian' then "puppet-agent\n"
                       when 'redhat' then "puppet-agent-0:9.0.0-1.noarch\n"
