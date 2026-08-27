@@ -1,5 +1,5 @@
 ---
-# Real Puppet 9 validation for puppet-stagehand/stagehand.
+# Real Puppet 9 validation for puppet-stagehand/stagehand-module.
 #
 # Puppet's authenticated package repos (apt-puppetcore.puppet.com,
 # yum-puppetcore.puppet.com) publish real puppet9 release packages, but:

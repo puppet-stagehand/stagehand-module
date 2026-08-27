@@ -1,5 +1,5 @@
 ---
-# Security/malware scanning for puppet-stagehand/stagehand.
+# Security/malware scanning for puppet-stagehand/stagehand-module.
 #
 # This is intentionally NOT part of the modulesync-managed ci.yml -- same
 # reasoning as stagehand-puppet9-acceptance.yml: it is Stagehand-owned
