@@ -1,7 +1,7 @@
 {
   "description": "Runs a pasted Ansible playbook against the node itself via `ansible-playbook --connection=local -i localhost,` (Bolt pushes this task, no separate Ansible control node). Installs Ansible first per install_method unless \"skip\". Rejects a playbook that does not declare both `hosts: localhost` and `connection: local` (defense-in-depth; the console API is authoritative).",
   "input_method": "stdin",
-  "files": ["stagehand/tasks/install_ansible.sh"],
+  "files": ["stagehand/tasks/install_ansible.sh", "stagehand/files/json_escape.sh"],
   "parameters": {
     "console_url": {
       "description": "Console base URL (server-injected).",

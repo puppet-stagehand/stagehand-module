@@ -227,16 +227,19 @@ info "case (f) ruby override: OK (STAGEHAND_RUBY_BIN honored by json_field/json_
 # Copies run_playbook.sh into a directory with NO install_ansible.sh sibling
 # (so the $0-relative sibling lookup finds nothing there), and points
 # PT__installdir at a second scratch directory shaped like a real Bolt
-# staging layout (stagehand/tasks/install_ansible.sh under its root). This
-# proves the fallback branch still engages and succeeds after D-08 flips the
-# lookup priority to sibling-first.
+# staging layout (the install helper and shared JSON encoder under its root).
+# This proves the fallback branch and both declared task files resolve from
+# the same real-Bolt-style installdir.
 ISOLATED_DIR="$WORK/isolated_run_playbook"
 mkdir -p "$ISOLATED_DIR" || fail "case (g) setup: mkdir isolated dir failed"
 cp "$RUN_PLAYBOOK_SH" "$ISOLATED_DIR/run_playbook.sh" || fail "case (g) setup: cp run_playbook.sh failed"
 
 INSTALLDIR_ROOT="$WORK/installdir_root"
-mkdir -p "$INSTALLDIR_ROOT/stagehand/tasks" || fail "case (g) setup: mkdir installdir root failed"
+mkdir -p "$INSTALLDIR_ROOT/stagehand/tasks" "$INSTALLDIR_ROOT/stagehand/files" \
+  || fail "case (g) setup: mkdir installdir root failed"
 cp "$SCRIPT_DIR/install_ansible.sh" "$INSTALLDIR_ROOT/stagehand/tasks/install_ansible.sh" || fail "case (g) setup: cp install_ansible.sh failed"
+cp "$SCRIPT_DIR/../files/json_escape.sh" "$INSTALLDIR_ROOT/stagehand/files/json_escape.sh" \
+  || fail "case (g) setup: cp json_escape.sh failed"
 
 : > "$ARGV_LOG"
 BODY=$(printf '{"playbook": %s, "install_method": "skip"}' "$(json_encode "$VALID_PLAYBOOK")")

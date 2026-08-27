@@ -52,34 +52,34 @@
 #   changes versus a console-only install.
 # @param hierascope_version
 #   Hierascope release version metadata, passed straight through to the
-#   console's `PCC_HIERASCOPE_VERSION` env var. Installer-supplied.
+#   console's `PSH_HIERASCOPE_VERSION` env var. Installer-supplied.
 # @param hierascope_protocol
 #   Hierascope protocol version metadata, passed straight through to the
-#   console's `PCC_HIERASCOPE_PROTOCOL` env var. Installer-supplied.
+#   console's `PSH_HIERASCOPE_PROTOCOL` env var. Installer-supplied.
 # @param hierascope_sha256
 #   Expected SHA-256 digest of the staged hierascope binary, passed straight
-#   through to the console's `PCC_HIERASCOPE_SHA256` env var so the console
+#   through to the console's `PSH_HIERASCOPE_SHA256` env var so the console
 #   can independently re-verify the artifact (defense in depth).
 # @param hierascope_key_id
 #   Minisign key ID the hierascope release was signed with, passed straight
-#   through to the console's `PCC_HIERASCOPE_KEY_ID` env var.
+#   through to the console's `PSH_HIERASCOPE_KEY_ID` env var.
 # @param hierascope_signature
 #   Minisign signature for the staged hierascope binary (already
 #   newline-escaped by the installer's own env emission convention), passed
-#   straight through to the console's `PCC_HIERASCOPE_SIGNATURE` env var.
+#   straight through to the console's `PSH_HIERASCOPE_SIGNATURE` env var.
 # @param hierascope_goos
 #   GOOS the staged hierascope binary was built for, passed straight through
-#   to the console's `PCC_HIERASCOPE_GOOS` env var.
+#   to the console's `PSH_HIERASCOPE_GOOS` env var.
 # @param hierascope_goarch
 #   GOARCH the staged hierascope binary was built for, passed straight
-#   through to the console's `PCC_HIERASCOPE_GOARCH` env var.
+#   through to the console's `PSH_HIERASCOPE_GOARCH` env var.
 # @param hierascope_hiera_config
 #   Hiera config path metadata the installer already resolved, passed
-#   straight through to the console's `PCC_HIERASCOPE_HIERA_CONFIG` env var.
+#   straight through to the console's `PSH_HIERASCOPE_HIERA_CONFIG` env var.
 #   Not Puppet-side derivable — pure pass-through metadata.
 # @param hierascope_puppet_major
 #   Puppet major-version metadata the installer already resolved, passed
-#   straight through to the console's `PCC_HIERASCOPE_PUPPET_MAJOR` env var.
+#   straight through to the console's `PSH_HIERASCOPE_PUPPET_MAJOR` env var.
 #   Not Puppet-side derivable — pure pass-through metadata.
 #
 # @example Co-located console + puppetserver primary
@@ -206,7 +206,7 @@ class stagehand::console (
     # `notify` on the console service: hierascope is invoked per-job by the
     # console, not a long-running service that needs a restart on binary
     # swap (T-43-10 -- console independently re-verifies via
-    # PCC_HIERASCOPE_* at readiness/execution time regardless of how this
+    # PSH_HIERASCOPE_* at readiness/execution time regardless of how this
     # file landed).
     if $hierascope_binary_source != '' {
       file { $hierascope_binary_path:

@@ -188,18 +188,18 @@ describe 'stagehand::console' do
 
     it { is_expected.to contain_package('openssl') }
 
-    it 'renders console.env with all ten PCC_HIERASCOPE_* lines carrying the supplied values' do
+    it 'renders console.env with all ten PSH_HIERASCOPE_* lines carrying the supplied values' do
       content = catalogue.resource('File', '/etc/puppet-console/console.env')[:content]
-      expect(content).to include('PCC_HIERASCOPE_PATH=/usr/local/bin/hierascope')
-      expect(content).to include('PCC_HIERASCOPE_VERSION=0.1.0')
-      expect(content).to include('PCC_HIERASCOPE_PROTOCOL=hierascope/v1')
-      expect(content).to include('PCC_HIERASCOPE_SHA256=d7508cc1ffc11fed213a46c982e79b694a74726598e834358687a4dfce83868f')
-      expect(content).to include('PCC_HIERASCOPE_KEY_ID=FC69CC1D307726F5')
-      expect(content).to include('PCC_HIERASCOPE_SIGNATURE=line1\nline2')
-      expect(content).to include('PCC_HIERASCOPE_GOOS=linux')
-      expect(content).to include('PCC_HIERASCOPE_GOARCH=amd64')
-      expect(content).to include('PCC_HIERASCOPE_HIERA_CONFIG=')
-      expect(content).to include('PCC_HIERASCOPE_PUPPET_MAJOR=')
+      expect(content).to include('PSH_HIERASCOPE_PATH=/usr/local/bin/hierascope')
+      expect(content).to include('PSH_HIERASCOPE_VERSION=0.1.0')
+      expect(content).to include('PSH_HIERASCOPE_PROTOCOL=hierascope/v1')
+      expect(content).to include('PSH_HIERASCOPE_SHA256=d7508cc1ffc11fed213a46c982e79b694a74726598e834358687a4dfce83868f')
+      expect(content).to include('PSH_HIERASCOPE_KEY_ID=FC69CC1D307726F5')
+      expect(content).to include('PSH_HIERASCOPE_SIGNATURE=line1\nline2')
+      expect(content).to include('PSH_HIERASCOPE_GOOS=linux')
+      expect(content).to include('PSH_HIERASCOPE_GOARCH=amd64')
+      expect(content).to include('PSH_HIERASCOPE_HIERA_CONFIG=')
+      expect(content).to include('PSH_HIERASCOPE_PUPPET_MAJOR=')
     end
   end
 

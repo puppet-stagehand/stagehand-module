@@ -78,14 +78,16 @@ end
 ' "$name" 2>/dev/null
 }
 
-# json_escape TEXT
-# Prints TEXT as a JSON-quoted string (including surrounding quotes),
-# properly escaping newlines/quotes/control characters — used to safely
-# embed arbitrary ansible-playbook output (which may contain anything) into
-# this script's own JSON stdout.
-json_escape() {
-  printf '%s' "$1" | "$RUBY" -rjson -e 'print JSON.generate(STDIN.read)'
-}
+# json_escape TEXT is shared with the other Stagehand POSIX tasks. It prints
+# a complete JSON string, including quotes, for arbitrary shell values.
+if [ -n "${PT__installdir:-}" ] && [ -f "${PT__installdir}/stagehand/files/json_escape.sh" ]; then
+  JSON_HELPER="${PT__installdir}/stagehand/files/json_escape.sh"
+else
+  JSON_HELPER="$(dirname "$0")/../files/json_escape.sh"
+fi
+[ -f "$JSON_HELPER" ] || die "JSON helper not found at $JSON_HELPER"
+# shellcheck disable=SC1090
+. "$JSON_HELPER"
 
 # ---- read the whole stdin JSON params object once (Bolt stdin input_method) ----
 RAW=$(cat)
@@ -156,7 +158,7 @@ export STAGEHAND_ANSIBLE_BIN
 # module-name path) is the secondary fallback, kept for edge cases where $0
 # isn't reliable — per D-07, this stays a one-off inline fix at this single
 # call site, not a generalized helper.
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || die "could not resolve script dir"
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || die "could not resolve script dir"
 if [ -f "$SCRIPT_DIR/install_ansible.sh" ]; then
   INSTALL_LIB="$SCRIPT_DIR/install_ansible.sh"
 elif [ -n "${PT__installdir:-}" ] && [ -f "${PT__installdir}/stagehand/tasks/install_ansible.sh" ]; then
