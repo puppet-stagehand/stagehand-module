@@ -266,11 +266,12 @@ class stagehand::platform_lock (
         name   => $postgresql_packages[$component],
       }
     }
+    $pg_trgm_check_command = $facts['os']['family'] ? {
+      'RedHat' => "/usr/sbin/runuser -u postgres -- /usr/pgsql-${postgresql_major}/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+      default  => "/usr/sbin/runuser -u postgres -- /usr/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
+    }
     exec { 'stagehand-platform-lock-observe-pg-trgm-extension':
-      command     => $facts['os']['family'] ? {
-        'RedHat' => "/usr/sbin/runuser -u postgres -- /usr/pgsql-${postgresql_major}/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
-        default  => "/usr/sbin/runuser -u postgres -- /usr/bin/psql --no-psqlrc --tuples-only --dbname puppetdb --command \"SELECT extversion FROM pg_extension WHERE extname='pg_trgm'\"",
-      },
+      command     => $pg_trgm_check_command,
       refreshonly => true,
       logoutput   => false,
       path        => ['/usr/bin', '/bin'],
@@ -334,10 +335,12 @@ class stagehand::platform_lock (
       # lint:endignore
     ].filter |$resource| { $resource != undef }
     $reload_after = $java_majors.empty ? { true => [], false => [Exec['stagehand-platform-lock-systemd-reload']] }
+    # lint:ignore:unquoted_string_in_selector
     $restart_after = [
       !$server_entries.empty ? { true => Exec['stagehand-platform-lock-restart-puppetserver'], false => undef },
       !$puppetdb_entries.empty ? { true => Exec['stagehand-platform-lock-restart-puppetdb'], false => undef },
     ].filter |$resource| { $resource != undef }
+    # lint:endignore
     $postgres_after = $postgresql_majors.empty ? {
       true    => [],
       default => $postgresql_packages.keys.map |String $component| { Package["stagehand-platform-lock-postgresql-${component}"] } + [Exec['stagehand-platform-lock-observe-pg-trgm-extension']],

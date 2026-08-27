@@ -30,10 +30,10 @@ class stagehand::platform_lock::observe (
     mode   => '0700',
   }
   file { $root:
-    ensure => directory,
-    owner  => 'root',
-    group  => 'root',
-    mode   => '0700',
+    ensure  => directory,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0700',
     require => File['/var/lib/stagehand'],
   }
   file { $helper:

@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "rule": "PSC-INST-003",
+    "path": "spec/classes/platform_lock_observe_spec.rb",
+    "reason": "Marshal.load(Marshal.dump(x)) is a deep-copy idiom applied only to in-memory test fixture data this same spec just built and dumped -- never external/untrusted input, unlike the eval-of-attacker-controlled-content pattern this rule targets.",
+    "owner": "matthewrstone",
+    "expires": "2027-02-27"
+  }
+]
