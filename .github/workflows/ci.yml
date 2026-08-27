@@ -217,6 +217,25 @@ jobs:
           bundle exec puppet strings generate --format markdown
           git diff --exit-code -- REFERENCE.md
 
+  # Non-blocking pending platform-lock evidence promotion: metadata.json's
+  # `operatingsystem_support` stays `[]` by design (README "Platform lock
+  # contract and support evidence"; enforced by the committed
+  # spec/data/platform_contract_spec.rb and
+  # spec/classes/platform_lock_observe_spec.rb specs, which fail if this
+  # module tries to populate the list without schema-valid live deployment
+  # evidence). With zero declared OS entries, voxpupuli/gha-puppet's
+  # reusable beaker.yml generates zero acceptance matrix legs per
+  # collection, so its "Test suite" sub-job always reports failure/skip --
+  # not a real regression, just a structurally-empty job. `continue-on-error`
+  # here mirrors the exact treatment already applied to `openvox9-beta`
+  # below: keep the job wired in (so it starts reporting real green/red the
+  # moment the platform-lock contract is legitimately promoted out of `[]`
+  # via apply-platform-support-evidence.sh, no workflow edit required at
+  # that point) without letting its structurally-guaranteed failure block
+  # this workflow's overall result. Decision: human call, 2026-08-27 (see
+  # pcm phase 04.1 stagehand.json ci_remediation escalation) -- option A
+  # (accept legs as non-required), explicitly NOT touching metadata.json or
+  # the platform-lock contract tests.
   package-resolution:
     name: ${{ matrix.collection }} dependency resolution
     strategy:
@@ -227,10 +246,19 @@ jobs:
           - puppet8
           - openvox8
     uses: voxpupuli/gha-puppet/.github/workflows/beaker.yml@v4
+    continue-on-error: true
     with:
       beaker_staging_url: ${{ inputs.beaker_staging_url }}
       beaker_collection: ${{ inputs.beaker_collection || matrix.collection }}
       beaker_staging_version: ${{ inputs.beaker_staging_version }}
+
+  package-resolution-gate:
+    name: dependency resolution (acceptance) — gate
+    needs: package-resolution
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "package-resolution result was ${{ needs.package-resolution.result }} (non-blocking by design -- see platform lock contract in README)"
 
   openvox9-beta:
     name: openvox9 dependency resolution (beta, best-effort)
