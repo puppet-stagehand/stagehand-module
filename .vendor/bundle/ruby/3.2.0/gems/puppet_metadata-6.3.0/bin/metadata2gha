@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require 'json'
+require 'puppet_metadata'
+
+options = {
+  domain: nil,
+  minimum_major_puppet_version: nil,
+  beaker_fact: nil,
+  beaker_hosts: nil,
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options] metadata"
+
+  opts.on('-c', '--collection VALUE', 'Limit GitHub jobs to only test this specific collection') { |opt| options[:collection] = opt }
+  opts.on('-d', '--domain VALUE', 'the domain for the box, only used when --use-fqdn is set to true') { |opt| options[:domain] = opt }
+  opts.on('--minimum-major-puppet-version VERSION', "Don't create actions for Puppet versions less than this major version") { |opt| options[:minimum_major_puppet_version] = opt }
+  opts.on('--beaker-facter FACT:LABEL:VALUES', 'Expand the matrix based on a fact. Separate values using commas') do |opt|
+    if opt != 'false'
+      fact, label, values = opt.split(':', 3)
+      label = fact if !label || label.empty?
+      raise OptionParser::InvalidArgument unless values
+
+      options[:beaker_facter] = [fact, label, values.split(',')]
+    end
+  end
+  opts.on('--beaker-hosts HOSTNAME:ROLES;HOSTNAME:ROLES;...', 'Expand the setfile string to create multiple hosts with custom roles. Roles string; see beaker-hostgenerator') do |opt|
+    if opt != 'false'
+      beaker_hosts = {}
+      opt.split(';').each do |host|
+        hostname, roles = host.split(':', 2)
+        beaker_hosts[hostname] = roles
+      end
+      options[:beaker_hosts] = beaker_hosts unless beaker_hosts.empty?
+    end
+  end
+end.parse!
+
+filename = ARGV[0]
+filename = 'metadata.json' if filename.nil? || filename.empty?
+
+begin
+  metadata = PuppetMetadata.read(filename)
+rescue StandardError => e
+  warn "Failed to read #{filename}: #{e}"
+  exit 2
+end
+
+github_output = ENV['GITHUB_OUTPUT'].nil? ? $stdout : File.open(ENV.fetch('GITHUB_OUTPUT', nil), 'a')
+metadata.github_actions(options).outputs.each do |name, value|
+  github_output.write("#{name}=#{value.to_json}\n")
+end
+github_output.close

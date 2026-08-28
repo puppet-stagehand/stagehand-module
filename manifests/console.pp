@@ -326,11 +326,12 @@ class stagehand::console (
     $pg_hba_file_cmd = "su - postgres -c \"psql -tAc 'SHOW hba_file'\" | tr -d '[:space:]'"
 
     exec { 'stagehand::console::pg_hba':
-      command => "PG_HBA_FILE=\$(${pg_hba_file_cmd}) && cat >> \${PG_HBA_FILE} <<'RULES'\n# puppet-console: console local TCP auth\nhost    ${db_name}    ${db_user}    127.0.0.1/32    scram-sha-256\nhost    ${db_name}    ${db_user}    ::1/128         scram-sha-256\nRULES\n",
-      unless  => "grep -q 'puppet-console' \$(${pg_hba_file_cmd})",
-      path    => $pg_exec_path,
-      require => Exec['stagehand::console::pg_db'],
-      notify  => Exec['stagehand::console::pg_hba_reload'],
+      command  => "PG_HBA_FILE=\$(${pg_hba_file_cmd}) && cat >> \${PG_HBA_FILE} <<'RULES'\n# puppet-console: console local TCP auth\nhost    ${db_name}    ${db_user}    127.0.0.1/32    scram-sha-256\nhost    ${db_name}    ${db_user}    ::1/128         scram-sha-256\nRULES\n",
+      unless   => "grep -q 'puppet-console' \$(${pg_hba_file_cmd})",
+      provider => shell,
+      path     => $pg_exec_path,
+      require  => Exec['stagehand::console::pg_db'],
+      notify   => Exec['stagehand::console::pg_hba_reload'],
     }
 
     exec { 'stagehand::console::pg_hba_reload':

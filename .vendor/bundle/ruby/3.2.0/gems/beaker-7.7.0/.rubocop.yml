@@ -1,0 +1,48 @@
+---
+inherit_from: .rubocop_todo.yml
+
+inherit_gem:
+  voxpupuli-rubocop: rubocop.yml
+
+Layout/LineLength:
+  Exclude:
+    - acceptance/**/*.rb
+    - spec/**/*.rb
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Naming/FileName:
+  Exclude:
+    - acceptance/**/acceptance-options.rb
+
+Naming/MethodParameterName:
+  MinNameLength: 1
+
+Naming/PredicatePrefix:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Exclude:
+    - acceptance/fixtures/module/spec/**/*.rb
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/StubbedMock:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/IndexedLet:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 4
+
+Style:
+  Enabled: false
+
+Naming/VariableNumber:
+  AllowedPatterns: ['x86_64']

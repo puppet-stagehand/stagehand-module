@@ -1,0 +1,39 @@
+---
+HOSTS:
+  centos9:
+    platform: el-9-x86_64
+    hypervisor: docker
+    image: quay.io/centos/centos:stream9
+    roles:
+      - master
+      - agent
+      - dashboard
+      - database
+      - classifier
+      - default
+    docker_cmd: '["/sbin/init"]'
+  debian12:
+    platform: debian-12-x86_64
+    hypervisor: docker
+    image: debian:12
+    roles:
+      - agent
+    docker_cmd: '["/sbin/init"]'
+CONFIG:
+  nfs_server: none
+  consoleport: 443
+  log_level: verbose
+  # Ubuntu runners need to run with full privileges
+  # RHEL derivitives just need the docker cap AUDIT_WRITE
+  dockeropts:
+    HostConfig:
+      Privileged: true
+  # docker_cap_add:
+  #   - AUDIT_WRITE
+  type: aio
+  ssh:
+    verify_host_key: false
+    user_known_hosts_file: '/dev/null'
+    password: root
+    auth_methods:
+      - password

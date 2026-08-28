@@ -1,0 +1,8 @@
+*.sw?
+*.gem
+Gemfile.lock
+/.bundle
+/vendor
+tests/*/last_*output
+.idea/
+.vendor/

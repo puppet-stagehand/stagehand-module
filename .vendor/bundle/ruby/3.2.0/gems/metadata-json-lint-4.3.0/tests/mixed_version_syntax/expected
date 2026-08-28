@@ -1,0 +1,1 @@
+(WARN) dependencies: Mixing "x" or "\*" version syntax with operators is not recommended in metadata.json, use one style in the puppetlabs/stdlib dependency: >= 3.2.x

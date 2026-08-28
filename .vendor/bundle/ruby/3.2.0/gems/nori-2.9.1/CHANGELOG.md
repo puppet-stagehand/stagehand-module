@@ -1,0 +1,278 @@
+# Nori changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.9.1] - 2026-07-05
+
+### Fixed
+
+* Under `:serializable`, a typecast value no longer drops the node's attributes. A text node whose content gets converted to a non-String (by `:advanced_typecasting` or a bare `type=` cast) now takes the same hash shape as string values: `<status source="ldap">true</status>` becomes `{"#text" => true, "@source" => "ldap"}` instead of a bare `true` that silently lost `@source`. This closes a data-dependent hole in the profile's no-silent-loss promise, where the same element kept or dropped its attributes depending on what its text happened to look like. The value at `#text` is whatever the typecasting produced. Combined with `standards: true` no typecasting happens and `#text` is always a string.
+
+* The `#text` key of the `:serializable` hash shape now goes through `:convert_tags_to` like every other key. Previously a key-converting formula (for example one that symbolizes keys) produced converted element and attribute keys next to a raw `"#text"` string key in the same hash. Nori's contract is that a `:convert_tags_to` formula sees every key it emits, which also means a caller who prefers a plain `text` key over the XML JSON convention can now map `"#text"` in their formula.
+
+## [2.9.0] - 2026-07-05
+
+### Changed
+
+* The `:standards` profile no longer applies schema-less typing. Under `Nori.new(standards: true)`, `:advanced_typecasting` now defaults to `false` (an explicit `advanced_typecasting: true` still wins), and the bare un-namespaced `type=` and `nil=` attributes become ordinary attributes instead of casting instructions. No more `type=` conversions (`integer`, `date`, `decimal`, `array`, `file`, ...), and only a prefixed `xsi:nil="true"` marks an element nil. These conventions come from Rails' `Hash.from_xml` (inherited via crack and merb), not from any XML spec. Without a schema, character data is just text. Knowing that `<id>123</id>` holds an integer is the business of a schema-aware layer, not a guess from string shape. Parsing without the profile is completely unchanged.
+
+### Added
+
+* Add the `:serializable` profile option. `Nori.new(serializable: true)` returns plain, directly-serializable data with no custom value classes. A text node that also has attributes becomes a Hash in the XML JSON convention (`{"#text" => content}` merged with our existing `@`-prefixed attributes instead of a `Nori::StringWithAttributes`, and a text node without attributes becomes a plain `String`. A `type="file"` node is no longer decoded into a `Nori::StringIOFile`, it folds into text and attributes like any other node, leaving the base64 content untouched for the caller to decode. That `type=` decoding is a Rails/ActiveSupport `Hash.from_xml` convention Nori inherited via crack and merb, not part of any XML spec, which is why the plain-data profile drops it. With this, values survive `to_json`, `to_yaml`, and `Marshal`. Opt-in on the 2.x line, probably the default in Nori 3.0. Reported by @ArnoldMEDLINQ ([#107](https://github.com/savonrb/nori/issues/107)), thanks to @dub357 for pinpointing the cause and finding [#106](https://github.com/savonrb/nori/pull/106), and thanks to @ekzobrain whose hash-shape approach this builds on.
+
+## [2.8.0] - 2026-07-04
+
+### Added
+
+* Add the `:standards` profile option. `Nori.new(standards: true)` turns on Nori's spec-correct parsing as a group rather than one flag at a time. Its first members are xml:space honoring (whitespace-only text under `xml:space="preserve"` is kept instead of stripped, with inheritance and `xml:space="default"` reset per [XML 1.0 §2.10](https://www.w3.org/TR/xml/#sec-white-space)) and the XML string-value model for empty elements (implies `:consistent_empty_tags` with an empty-string `:empty_tag_value`, both still overridable). Opt-in on the 2.x line, default in 3.0. Thanks to @md5 for raising the `xml:space="preserve"` case on [#97](https://github.com/savonrb/nori/issues/97).
+
+* [#97](https://github.com/savonrb/nori/issues/97) Add the `:consistent_empty_tags` option ([#109](https://github.com/savonrb/nori/pull/109)). When enabled, every empty tag becomes the `:empty_tag_value`, whether it has attributes or not. A string value keeps the attributes accessible via `#attributes`, and an explicit `xsi:nil="true"` always becomes `nil`. Reported by @lukasbischof, who also proposed a fix in [#98](https://github.com/savonrb/nori/pull/98). Thanks to @md5 for surfacing another instance of it and pinpointing the cause.
+
+### Fixed
+
+* Whitespace-only CDATA content is no longer stripped. A `<![CDATA[   ]]>` section is the author's explicit literal-data marker, so its content is now preserved as text instead of being dropped, on both the Nokogiri and REXML parsers. Previously such a tag parsed to `nil` (or, with attributes, dropped the content and kept only the attributes). Non-whitespace CDATA is unchanged, and ordinary whitespace-only text is still stripped as before. Surfaced while auditing whitespace handling for [#97](https://github.com/savonrb/nori/issues/97), the same empty-tag/whitespace spec-compliance work as the `:consistent_empty_tags` option above.
+
+## 2.7.1 (2024-07-28)
+
+* Stop monkey-patching String with #snakecase by @mchu in https://github.com/savonrb/nori/pull/102
+
+## 2.7.0 (2024-02-13)
+
+* Added support for ruby 3.1, 3.2, 3.3. Dropped support for ruby 2.7 and below.
+* Feature: `Nori::Parser` has a new option, `:scrub_xml`, which defaults to true, for scrubbing invalid characters ([#72](https://github.com/savonrb/nori/pull/72)). This should allow documents containing invalid characters to still be parsed.
+* Fix: REXML parser changes `&lt;` inside CDATA to `<` ([#94](https://github.com/savonrb/nori/pull/94))
+* Change: `Object#blank?` is no longer patched in.
+
+## 2.6.0 (2015-05-06)
+
+* Feature: [#69](https://github.com/savonrb/nori/pull/69) Add option to convert empty tags to a value other than nil.
+
+## 2.5.0 (2015-03-31)
+
+* Formally drop support for ruby 1.8.7. Installing Nori from rubygems for that version should no longer attempt to install versions that will not work.
+* BREAKING CHANGE: Newlines are now preserved when present in the value of inner text nodes. See the example below:
+
+before:
+
+```
+Nori.new.parse("<outer>\n&lt;embedded&gt;\n&lt;one&gt;&lt;/one&gt;\n&lt;two&gt;&lt;/two&gt;\n&lt;embedded&gt;\n</outer>")
+=> {"outer"=>"<embedded><one></one><two></two><embedded>"}
+```
+
+after:
+```
+Nori.new.parse("<outer>\n&lt;embedded&gt;\n&lt;one&gt;&lt;/one&gt;\n&lt;two&gt;&lt;/two&gt;\n&lt;embedded&gt;\n</outer>")
+=> {"outer"=>"<embedded>\n<one></one>\n<two></two>\n<embedded>\n"}
+```
+
+## 2.4.0 (2014-04-19)
+
+* Change: Dropped support for ruby 1.8, rubinius and ree
+
+* Feature: Added `:convert_attributes` feature similar to `:convert_tags_to`
+
+* Feature: Added `:convert_dashes_to_underscore` option
+
+## 2.3.0 (2013-07-26)
+
+* Change: `Nori#find` now ignores namespace prefixes in Hash keys it is searching through.
+
+* Fix: Limited Nokogiri to < 1.6, because v1.6 dropped support for Ruby 1.8.
+
+## 2.2.0 (2013-04-25)
+
+* Feature: [#42](https://github.com/savonrb/nori/pull/42) adds the `:delete_namespace_attributes`
+  option to remove namespace attributes like `xmlns:*` or `xsi:*`.
+
+## 2.1.0 (2013-04-21)
+
+* Feature: Added `Nori.hash_key` and `Nori#find` to work with Hash keys generated by Nori.
+  Original issue: [savonrb/savon#393](https://github.com/savonrb/savon/pull/393)
+
+## 2.0.4 (2013-02-26)
+
+* Fix: [#37](https://github.com/savonrb/nori/issues/37) special characters
+  problem on Ruby 1.9.3-p392.
+
+## 2.0.3 (2013-01-10)
+
+* Fix for remote code execution bug. For more in-depth information, read about the
+  recent [Rails hotfix](https://groups.google.com/forum/?fromgroups=#!topic/rubyonrails-security/61bkgvnSGTQ).
+  Please make sure to upgrade now!
+
+## 2.0.2 (YANKED)
+
+* Yanked because of a problem with XML that starts with an instruction tag.
+
+## 2.0.1 (YANKED)
+
+* Yanked because of a problem with XML that starts with an instruction tag.
+
+## 2.0.0 (2012-12-12)
+
+Please make sure to read the updated README for how to use the new version.
+
+* Change: Nori now defaults to use the Nokogiri parser.
+
+* Refactoring: Changed the `Nori` module to a class. This might cause problems if you
+  included the `Nori` module somewhere in your application. This use case was removed
+  for overall simplicity.
+
+* Refactoring: Changed the interface to remove any global state. The global configuration
+  is gone and replaced with simple options to be passed to `Nori.new`.
+
+    ``` ruby
+    parser = Nori.new(strip_namespaces: true)
+    parser.parse(xml)
+    ```
+
+* Refactoring: Removed the `Nori::Parser` module methods. After refactoring the rest,
+  there was only a single method left for this module and that was moved to `Nori`.
+
+* Fix: [#16](https://github.com/savonrb/nori/issues/16) strip XML passed to Nori.
+
+## 1.1.5 (2013-03-03)
+
+* Fix: [#37](https://github.com/savonrb/nori/issues/37) special characters
+  problem on Ruby 1.9.3-p392.
+
+## 1.1.4 (2013-01-10)
+
+* Fix for remote code execution bug. For more in-depth information, read about the
+  recent [Rails hotfix](https://groups.google.com/forum/?fromgroups=#!topic/rubyonrails-security/61bkgvnSGTQ).
+  Please make sure to upgrade now!
+
+## 1.1.3 (2012-07-12)
+
+* Fix: Merged [pull request 21](https://github.com/savonrb/nori/pull/21) to fix an
+  issue with date/time/datetime regexes not matching positive time zone offsets and
+  datetime strings with seconds.
+
+## 1.1.2 (2012-06-30)
+
+* Fix: Reverted `Object#xml_attributes` feature which is planned for version 2.0.
+
+## 1.1.1 (2012-06-29) - yanked
+
+* Fix: Merged [pull request 17](https://github.com/savonrb/nori/pull/17) for improved
+  xs:time/xs:date/xs:dateTime regular expression matchers.
+
+## 1.1.0 (2012-02-17)
+
+* Improvement: Merged [pull request 9](https://github.com/savonrb/nori/pull/9) to
+  allow multiple configurations of Nori.
+
+* Fix: Merged [pull request 10](https://github.com/savonrb/nori/pull/10) to handle
+  date/time parsing errors. Fixes a couple of similar error reports.
+
+## 1.0.2 (2011-07-04)
+
+* Fix: When specifying a custom formula to convert tags, XML attributes were ignored.
+  Now, a formula is applied to both XML tags and attributes.
+
+## 1.0.1 (2011-06-21)
+
+* Fix: Make sure to always load both StringWithAttributes and StringIOFile
+  to prevent NameError's.
+
+## 1.0.0 (2011-06-20)
+
+* Notice: As of v1.0.0, Nori will follow [Semantic Versioning](http://semver.org).
+
+* Feature: Added somewhat advanced typecasting:
+
+  What this means:
+
+  * "true" and "false" are converted to TrueClass and FalseClass
+  * Strings matching an xs:time, xs:date and xs:dateTime are converted
+    to Time, Date and DateTime objects.
+
+  You can disable this feature via:
+
+      Nori.advanced_typecasting = false
+
+* Feature: Added an option to strip the namespaces from every tag.
+  This feature might raise problems and is therefore disabled by default.
+
+      Nori.strip_namespaces = true
+
+* Feature: Added an option to specify a custom formula to convert tags.
+  Here's an example:
+
+      Nori.configure do |config|
+        config.convert_tags_to { |tag| tag.snake_case.to_sym }
+      end
+
+      xml = '<userResponse><accountStatus>active</accountStatus></userResponse>'
+      parse(xml).should ## { :user_response => { :account_status => "active" }
+
+## 0.2.4 (2011-06-21)
+
+* Fix: backported fixes from v1.0.1
+
+## 0.2.3 (2011-05-26)
+
+* Fix: Use extended core classes StringWithAttributes and StringIOFile instead of
+  creating singletons to prevent serialization problems.
+
+## 0.2.2 (2011-05-16)
+
+* Fix: namespaced xs:nil values should be nil objects.
+
+## 0.2.1 (2011-05-15)
+
+* Fix: Changed XML attributes converted to Hash keys to be prefixed with an @-sign.
+  This avoids problems with attributes and child nodes having the same name.
+
+      <multiRef id="id1">
+        <approved xsi:type="xsd:boolean">true</approved>
+        <id xsi:type="xsd:long">76737</id>
+      </multiRef>
+
+  is now translated to:
+
+      { "multiRef" => { "@id" => "id1", "id" => "76737", "approved" => "true" } }
+
+## 0.2.0 (2011-04-30)
+
+* Removed JSON from the original Crack basis
+* Fixed a problem with Object#blank?
+* Added swappable parsers
+* Added a Nokogiri parser with you can switch to via:
+
+      Nori.parser = :nokogiri
+
+## 0.1.7 2010-02-19
+* 1 minor patch
+  * Added patch from @purp for ISO 8601 date/time format
+
+## 0.1.6 2010-01-31
+* 1 minor patch
+  * Added Crack::VERSION constant - http://weblog.rubyonrails.org/2009/9/1/gem-packaging-best-practices
+
+## 0.1.5 2010-01-27
+* 1 minor patch
+  * Strings that begin with dates shouldn't be parsed as such (sandro)
+
+## 0.1.3 2009-06-22
+* 1 minor patch
+  * Parsing a text node with attributes stores them in the attributes method (tamalw)
+
+## 0.1.2 2009-04-21
+* 2 minor patches
+  * Correct unnormalization of attribute values (der-flo)
+  * Fix error in parsing YAML in the case where a hash value ends with backslashes, and there are subsequent values in the hash (deadprogrammer)
+
+## 0.1.1 2009-03-31
+* 1 minor patch
+  * Parsing empty or blank xml now returns empty hash instead of raising error.
+
+## 0.1.0 2009-03-28
+* Initial release.
+
+[2.9.1]: https://github.com/savonrb/nori/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/savonrb/nori/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/savonrb/nori/compare/v2.7.1...v2.8.0

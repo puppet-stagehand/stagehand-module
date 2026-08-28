@@ -1,0 +1,41 @@
+# -*- encoding: utf-8 -*-
+# stub: openvox 8.23.1 ruby lib
+
+Gem::Specification.new do |s|
+  s.name = "openvox".freeze
+  s.version = "8.23.1"
+
+  s.required_rubygems_version = Gem::Requirement.new("> 1.3.1".freeze) if s.respond_to? :required_rubygems_version=
+  s.require_paths = ["lib".freeze]
+  s.authors = ["OpenVox Project".freeze]
+  s.date = "2012-08-17"
+  s.description = "OpenVox is a community implementation of Puppet, an automated administrative engine for your Linux, Unix, and Windows systems, performs administrative tasks\n(such as adding users, installing packages, and updating server configurations) based on a centralized specification.\n".freeze
+  s.email = "openvox@voxpupuli.org".freeze
+  s.executables = ["puppet".freeze]
+  s.files = ["bin/puppet".freeze]
+  s.homepage = "https://github.com/OpenVoxProject/puppet".freeze
+  s.licenses = ["Apache-2.0".freeze]
+  s.rdoc_options = ["--title".freeze, "OpenVox - Configuration Management".freeze, "--main".freeze, "README".freeze, "--line-numbers".freeze]
+  s.required_ruby_version = Gem::Requirement.new(">= 3.1.0".freeze)
+  s.rubygems_version = "3.4.20".freeze
+  s.summary = "OpenVox, a community implementation of Puppet -- an automated configuration management tool".freeze
+
+  s.installed_by_version = "3.4.20" if s.respond_to? :installed_by_version
+
+  s.specification_version = 4
+
+  s.add_runtime_dependency(%q<base64>.freeze, [">= 0.1", "< 0.4"])
+  s.add_runtime_dependency(%q<benchmark>.freeze, [">= 0.3", "< 0.5"])
+  s.add_runtime_dependency(%q<concurrent-ruby>.freeze, ["~> 1.0"])
+  s.add_runtime_dependency(%q<deep_merge>.freeze, ["~> 1.0"])
+  s.add_runtime_dependency(%q<fast_gettext>.freeze, [">= 2.1", "< 5"])
+  s.add_runtime_dependency(%q<getoptlong>.freeze, ["~> 0.2.0"])
+  s.add_runtime_dependency(%q<locale>.freeze, ["~> 2.1"])
+  s.add_runtime_dependency(%q<multi_json>.freeze, ["~> 1.13"])
+  s.add_runtime_dependency(%q<openfact>.freeze, ["~> 5.0"])
+  s.add_runtime_dependency(%q<ostruct>.freeze, ["~> 0.6.0"])
+  s.add_runtime_dependency(%q<puppet-resource_api>.freeze, ["~> 1.5"])
+  s.add_runtime_dependency(%q<racc>.freeze, ["~> 1.5"])
+  s.add_runtime_dependency(%q<scanf>.freeze, ["~> 1.0"])
+  s.add_runtime_dependency(%q<semantic_puppet>.freeze, ["~> 1.0"])
+end
