@@ -72,7 +72,16 @@ jobs:
         run: gitleaks detect --no-banner --no-git --source . --redact
 
       - name: Scan full git history
-        run: gitleaks detect --no-banner --source . --redact
+        # --log-opts scopes the scan to commits reachable from the checked-
+        # out ref (fetch-depth: 0 above pulls every branch's objects into
+        # the local .git, and gitleaks' git-log scan defaults to walking
+        # *all* of them). Without this, an unrelated branch's history can
+        # fail this gate on every unrelated push/tag -- this repo hit that
+        # exact case 2026-08-28 when a stray branch committed a vendored
+        # gem tree containing test-fixture private keys; that branch's own
+        # PR checks already catch it independently. Scope to the ref under
+        # test, matching what this gate is actually meant to verify.
+        run: gitleaks detect --no-banner --source . --redact --log-opts=HEAD
 
   puppet-supplychain:
     name: Puppet/Ruby static pattern checks
