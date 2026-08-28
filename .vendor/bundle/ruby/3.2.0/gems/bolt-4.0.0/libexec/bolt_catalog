@@ -1,0 +1,68 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bolt'
+require 'bolt/catalog'
+require 'json'
+
+# This accepts a catalog request on stdin:
+# { "code_ast": "JSON serialized Puppet AST",
+#   "code_string": "String of code, ignored if AST is provided",
+#   "modulepath": "Array of directories to use as the modulepath for catalog compilation",
+#   "pdb_config": "A hash of PDB client config options as supplied to Bolt",
+#   "hiera_config": "File path to hiera config file",
+#   "target": {
+#     "name": "the name of the node usually fqdn fro url",
+#     "facts": "Hash of facts to use for the node",
+#     "variables": "Hash of variables to use for compilation",
+#     "trusted": "Hash of trusted data for the node"
+#   },
+#   "inventory": JSON serialized information about inventory {
+#       "data": Data stored in inventory @data instance variable,
+#       "target_hash": {
+#         "target_vars": Vars that may have been updated plan,
+#         "target_facts": Facts that may have been updated in plan,
+#         "target_features": Features that may have been updated in plan,
+#       },
+#       "config": {
+#         "transport": Transport to use,
+#         "transports": Array of transport configs (note that transport keys are stringified)
+#       }
+#   }
+# }
+
+command = ARGV[0]
+case command
+when "parse"
+  code = File.open(ARGV[1], &:read)
+  puts JSON.pretty_generate(Bolt::Catalog.new.generate_ast(code, ARGV[1]))
+when "compile"
+  request = if ARGV[1]
+              File.open(ARGV[1]) { |fh| JSON.parse(fh.read) }
+            else
+              JSON.parse($stdin.read)
+            end
+  begin
+    catalog = Bolt::Catalog.new.compile_catalog(request)
+    # This seems to be a string in ruby 2.3
+    if catalog.is_a?(String)
+      catalog = JSON.parse(catalog)
+    end
+    puts JSON.pretty_generate(catalog)
+  rescue Puppet::PreformattedError => e
+    message = if e.cause
+                location_info = Puppet::Util::Errors.error_location_with_space(e.file, e.line, e.pos)
+                "#{e.cause.message}#{location_info}"
+              else
+                e.message
+              end
+    puts({ message: message, backtrace: e.backtrace }.to_json)
+    exit 1
+  rescue StandardError => e
+    puts({ message: e.message, backtrace: e.backtrace }.to_json)
+    exit 1
+  end
+else
+  puts "USAGE: run 'bolt_catalog compile' with a request on STDIN " \
+       "or 'bolt_catalog parse manifest.pp' to generate JSON AST"
+end

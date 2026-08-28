@@ -1,0 +1,9 @@
+source ENV['GEM_SOURCE'] || 'https://rubygems.org'
+
+gem 'ffi'
+gem 'json', require: false
+# workaround for https://tickets.puppetlabs.com/projects/FACT/issues/FACT-3091
+# facter requires/uses the sys-filesystem gem, but it is currently not listed in the gemspec file from facter
+gem 'sys-filesystem'
+
+gem 'facter', ENV.fetch('FACTER_GEM_VERSION', nil), require: false

@@ -132,7 +132,8 @@ describe 'stagehand::console' do
 
     it {
       is_expected.to contain_exec('stagehand::console::pg_hba').with(
-        require: 'Exec[stagehand::console::pg_db]',
+        require:  'Exec[stagehand::console::pg_db]',
+        provider: 'shell',
       ).that_notifies('Exec[stagehand::console::pg_hba_reload]')
     }
 

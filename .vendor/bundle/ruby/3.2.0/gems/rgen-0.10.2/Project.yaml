@@ -1,0 +1,22 @@
+name: rgen
+gemspec: rgen.gemspec
+git: https://github.com/mthiede/rgen.git
+version: 0.10.2
+summary: Ruby Modelling and Generator Framework
+email: martin dot thiede at gmx de
+homepage: http://ruby-gen.org
+rubyforge_project: rgen
+description: RGen is a framework for Model Driven Software Development (MDSD) in Ruby. This means that it helps you build Metamodels, instantiate Models, modify and transform Models and finally generate arbitrary textual content from it.
+authors: [Martin Thiede]
+rdoc_options: [--main, README.rdoc, -x, test, -x, metamodels, -x, ea_support/uml13*]
+extra_rdoc_files: [README.rdoc, CHANGELOG, MIT-LICENSE]
+include_files: ['lib/**/*', 'test/**/*', README.rdoc, CHANGELOG, MIT-LICENSE, Rakefile]
+exclude_files: ['**/*.bak']
+encrypt_sources: false
+dependencies:
+  https://rubygems.org:
+    - {name: nokogiri,           version: ['>= 1.15.4', '< 1.16'],    development: true}
+    - {name: rake,               version: ['>= 13.0.0', '< 14.0'],    development: true}
+    - {name: minitest,           version: ['>= 5.20.0', '< 6.0'],     development: true}
+    - {name: minitest-fail-fast, version: ['>= 0.1.0', '< 0.2'],      development: true}
+    - {name: andand,             version: ['>= 1.3.3', '< 1.4'],      development: true}

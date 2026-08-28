@@ -1,0 +1,13 @@
+.bundle/
+Gemfile.lock
+coverage/
+.vagrant/
+.envrc
+vendor/
+.vendor/
+.yardoc
+packer_cache/
+*.box
+build_docs/
+database/
+hugo/public

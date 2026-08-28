@@ -1,0 +1,122 @@
+<%# encoding: UTF-8 -%>
+.Dd <%= Time.now.strftime("%b %d, %Y") %>
+.Dt FACTER 1
+.Os
+.Sh NAME
+.Nm facter
+.Nd collect and display facts about the current system
+.Sh SYNOPSIS
+.Nm
+.Op Ar options
+.Op Ar query ...
+<% Facter::Cli.commands.select { |_k, command_class| command_class.instance_of?(Thor::Command) }.each do |name, command| -%>
+.Nm
+.Fl Fl <%= name.to_s.gsub('_','-') %>
+<% end -%>
+.Sh DESCRIPTION
+.Nm
+is a command-line tool that gathers basic facts about nodes (systems) such as hardware details, network settings, OS type and version, and more.
+These facts are made available as variables in your Puppet manifests and can be used to inform conditional expressions in Puppet.
+.Pp
+If no queries are given, then all facts will be returned.
+.Pp
+Many of the command line options can also be set via the HOCON config file. This file can also be used to block or cache certain fact groups.
+.Sh OPTIONS
+.Bl -tag
+<% Facter::Cli.class_options.each do |name, option| -%><% next if option.hide-%>
+.It <% if option.aliases.any? %>Fl <%= option.aliases[0].sub(/^-/, '') %> , <% end %>Fl Fl <%= 'no-' if negate_options.include?(name.to_s)%><%= name.to_s.gsub('_','-') %><% if option.type == :string %>= Ns Ar value<% end %>
+<%= option.description %>
+<% end -%>
+.El
+.Sh FILES
+.Bl -tag
+.It /etc/puppetlabs/facter/facter.conf
+A HOCON config file that can be used to specify directories for custom and external facts, set various command line options, and specify facts to block. See example below for details, or visit the [GitHub README](https://github.com/puppetlabs/puppetlabs-hocon#overview).
+.El
+.Sh EXAMPLES
+Display all facts:
+.Bd -literal -offset indent
+$ facter
+disks => {
+  sda => {
+    model => "Virtual disk",
+    size => "8.00 GiB",
+    size_bytes => 8589934592,
+    vendor => "ExampleVendor"
+  }
+}
+dmi => {
+  bios => {
+    release_date => "06/23/2013",
+    vendor => "Example Vendor",
+    version => "6.00"
+  }
+}
+[...]
+.Ed
+.Pp
+Display a single structured fact:
+.Bd -literal -offset indent
+$ facter processors
+{
+  count => 2,
+  isa => "x86_64",
+  models => [
+    "Intel(R) Xeon(R) CPU E5-2680 v2 @ 2.80GHz",
+    "Intel(R) Xeon(R) CPU E5-2680 v2 @ 2.80GHz"
+  ],
+  physicalcount => 2
+}
+.Ed
+.Pp
+Display a single fact nested within a structured fact:
+.Bd -literal -offset indent
+$ facter processors.isa
+x86_64
+.Ed
+.Pp
+Display a single legacy fact. Note that non-structured facts existing in previous versions of Facter are still available,
+but are not displayed by default due to redundancy with newer structured facts:
+.Bd -literal -offset indent
+$ facter processorcount
+2
+.Ed
+.Pp
+Format facts as JSON:
+.Bd -literal -offset indent
+$ facter --json os.name os.release.major processors.isa
+{
+  "os.name": "Ubuntu",
+  "os.release.major": "14.04",
+  "processors.isa": "x86_64"
+}
+.Ed
+.Pp
+An example config file:
+.Bd -literal -offset indent
+# always loaded (CLI and as Ruby module)
+global : {
+    external-dir : "~/external/facts",
+    custom-dir   :  [
+       "~/custom/facts",
+       "~/custom/facts/more-facts"
+    ],
+    no-external-facts : false,
+    no-custom-facts   : false,
+    no-ruby           : false
+}
+# loaded when running from the command line
+cli : {
+    debug     : false,
+    trace     : true,
+    verbose   : false,
+    log-level : "info"
+}
+# always loaded, fact-specific configuration
+facts : {
+    # for valid blocklist entries, use --list-block-groups
+    blocklist : [ "file system", "EC2" ],
+    # for valid time-to-live entries, use --list-cache-groups
+    ttls : [ { "timezone" : 30 days } ]
+}
+.Ed

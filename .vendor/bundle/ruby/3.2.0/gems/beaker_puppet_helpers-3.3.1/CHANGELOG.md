@@ -1,0 +1,232 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [3.3.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.3.1) (2026-04-02)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.3.0...3.3.1)
+
+**Fixed bugs:**
+
+- gemspec: remove allowed\_push\_host [\#106](https://github.com/voxpupuli/beaker_puppet_helpers/pull/106) ([bastelfreak](https://github.com/bastelfreak))
+
+## [3.3.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.3.0) (2026-04-02)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.2.1...3.3.0)
+
+**Implemented enhancements:**
+
+- Implement support for installing staging packages [\#102](https://github.com/voxpupuli/beaker_puppet_helpers/pull/102) ([bastelfreak](https://github.com/bastelfreak))
+
+## [3.2.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.2.1) (2026-01-21)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.2.0...3.2.1)
+
+**Fixed bugs:**
+
+- apply\_manifest\_on no longer returns the output of the command [\#99](https://github.com/voxpupuli/beaker_puppet_helpers/issues/99)
+- Restore behavior of apply\_manifest\_on [\#100](https://github.com/voxpupuli/beaker_puppet_helpers/pull/100) ([jaevans](https://github.com/jaevans))
+
+## [3.2.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.2.0) (2026-01-06)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.1.1...3.2.0)
+
+**Implemented enhancements:**
+
+- Add Ruby 4.0 support [\#96](https://github.com/voxpupuli/beaker_puppet_helpers/pull/96) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Respect `BEAKER_destroy` for manifest cleanup [\#93](https://github.com/voxpupuli/beaker_puppet_helpers/pull/93) ([bwitt](https://github.com/bwitt))
+
+## [3.1.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.1.1) (2025-09-22)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.1.0...3.1.1)
+
+**Fixed bugs:**
+
+- open-uri: Move from development to runtime dependency [\#83](https://github.com/voxpupuli/beaker_puppet_helpers/pull/83) ([bastelfreak](https://github.com/bastelfreak))
+- nokogiri: Move from dev to runtime dependency [\#82](https://github.com/voxpupuli/beaker_puppet_helpers/pull/82) ([bastelfreak](https://github.com/bastelfreak))
+
+## [3.1.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.1.0) (2025-09-22)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/3.0.0...3.1.0)
+
+**Implemented enhancements:**
+
+- \(\#77\) Add support for installing openvox on windows [\#78](https://github.com/voxpupuli/beaker_puppet_helpers/pull/78) ([michael-riddle](https://github.com/michael-riddle))
+
+**Fixed bugs:**
+
+- gemspec: Dont set upper limit for ruby version [\#80](https://github.com/voxpupuli/beaker_puppet_helpers/pull/80) ([bastelfreak](https://github.com/bastelfreak))
+
+## [3.0.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/3.0.0) (2025-08-07)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/2.3.0...3.0.0)
+
+**Breaking changes:**
+
+- Require Ruby 3.2 or newer [\#73](https://github.com/voxpupuli/beaker_puppet_helpers/pull/73) ([bastelfreak](https://github.com/bastelfreak))
+
+**Implemented enhancements:**
+
+- beaker: Allow 7.x [\#72](https://github.com/voxpupuli/beaker_puppet_helpers/pull/72) ([bastelfreak](https://github.com/bastelfreak))
+
+**Merged pull requests:**
+
+- CI: Dont test on Debian 10 [\#71](https://github.com/voxpupuli/beaker_puppet_helpers/pull/71) ([bastelfreak](https://github.com/bastelfreak))
+
+## [2.3.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/2.3.0) (2025-06-15)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/2.2.0...2.3.0)
+
+**Implemented enhancements:**
+
+- Remove base64 & benchmark dependencies [\#68](https://github.com/voxpupuli/beaker_puppet_helpers/pull/68) ([bastelfreak](https://github.com/bastelfreak))
+
+## [2.2.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/2.2.0) (2025-03-19)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/2.1.0...2.2.0)
+
+**Implemented enhancements:**
+
+- Support the none collection in implementation helpers [\#62](https://github.com/voxpupuli/beaker_puppet_helpers/pull/62) ([ekohl](https://github.com/ekohl))
+
+## [2.1.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/2.1.0) (2025-03-19)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/2.0.0...2.1.0)
+
+**Implemented enhancements:**
+
+- Add helper to get agent package name based on collection [\#60](https://github.com/voxpupuli/beaker_puppet_helpers/pull/60) ([bastelfreak](https://github.com/bastelfreak))
+
+## [2.0.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/2.0.0) (2025-03-18)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.6.0...2.0.0)
+
+**Breaking changes:**
+
+- Drop support for nightly repos [\#57](https://github.com/voxpupuli/beaker_puppet_helpers/pull/57) ([bastelfreak](https://github.com/bastelfreak))
+
+**Implemented enhancements:**
+
+- CI: Use voxpupuli/ruby-version@v1 / Add Ruby 3.4 support [\#58](https://github.com/voxpupuli/beaker_puppet_helpers/pull/58) ([bastelfreak](https://github.com/bastelfreak))
+- Implement OpenVox support [\#56](https://github.com/voxpupuli/beaker_puppet_helpers/pull/56) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.6.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.6.0) (2024-12-11)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.5.0...1.6.0)
+
+**Implemented enhancements:**
+
+- update fact\_on\(\) from `facter` to `puppet facts` [\#54](https://github.com/voxpupuli/beaker_puppet_helpers/pull/54) ([bastelfreak](https://github.com/bastelfreak))
+
+**Merged pull requests:**
+
+- voxpupuli-rubocop: Update 2.7.0-\>3.0.0 [\#53](https://github.com/voxpupuli/beaker_puppet_helpers/pull/53) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.5.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.5.0) (2024-10-16)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.4.0...1.5.0)
+
+**Implemented enhancements:**
+
+- puppet-modulebuilder: Allow 2.x [\#51](https://github.com/voxpupuli/beaker_puppet_helpers/pull/51) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.4.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.4.0) (2024-05-28)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.3.0...1.4.0)
+
+**Implemented enhancements:**
+
+- beaker: Allow 6.x [\#47](https://github.com/voxpupuli/beaker_puppet_helpers/pull/47) ([bastelfreak](https://github.com/bastelfreak))
+- Use tmpfile extension [\#3](https://github.com/voxpupuli/beaker_puppet_helpers/pull/3) ([ekohl](https://github.com/ekohl))
+
+**Merged pull requests:**
+
+- .gitignore: add .bundle [\#46](https://github.com/voxpupuli/beaker_puppet_helpers/pull/46) ([bastelfreak](https://github.com/bastelfreak))
+- voxpupuli-rubocop: Require 2.7.0 [\#45](https://github.com/voxpupuli/beaker_puppet_helpers/pull/45) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.3.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.3.0) (2024-05-02)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.2.1...1.3.0)
+
+**Implemented enhancements:**
+
+- Add Ruby 3.3 to CI [\#44](https://github.com/voxpupuli/beaker_puppet_helpers/pull/44) ([traylenator](https://github.com/traylenator))
+- New beaker helper `bolt_supported?` to show bolt availability [\#42](https://github.com/voxpupuli/beaker_puppet_helpers/pull/42) ([traylenator](https://github.com/traylenator))
+
+## [1.2.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.2.1) (2024-01-08)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.2.0...1.2.1)
+
+**Fixed bugs:**
+
+- shell escape Puppet command options [\#40](https://github.com/voxpupuli/beaker_puppet_helpers/pull/40) ([ekohl](https://github.com/ekohl))
+- FreeBSD has the Puppet major version in the package name [\#39](https://github.com/voxpupuli/beaker_puppet_helpers/pull/39) ([evgeni](https://github.com/evgeni))
+
+## [1.2.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.2.0) (2023-10-17)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.1.1...1.2.0)
+
+**Implemented enhancements:**
+
+- Always use puppet-agent for Debian 12+ & Ubuntu 23.04+ [\#37](https://github.com/voxpupuli/beaker_puppet_helpers/pull/37) ([ekohl](https://github.com/ekohl))
+
+## [1.1.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.1.1) (2023-06-16)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.1.0...1.1.1)
+
+**Fixed bugs:**
+
+- fix typo in EL package selection [\#32](https://github.com/voxpupuli/beaker_puppet_helpers/pull/32) ([bastelfreak](https://github.com/bastelfreak))
+
+**Merged pull requests:**
+
+- CI: Run on PRs+merges to master [\#33](https://github.com/voxpupuli/beaker_puppet_helpers/pull/33) ([bastelfreak](https://github.com/bastelfreak))
+- README.md: Correct link to CI jobs [\#30](https://github.com/voxpupuli/beaker_puppet_helpers/pull/30) ([bastelfreak](https://github.com/bastelfreak))
+- GCG: Add faraday-retry dep [\#29](https://github.com/voxpupuli/beaker_puppet_helpers/pull/29) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.1.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.1.0) (2023-06-01)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.0.1...1.1.0)
+
+**Implemented enhancements:**
+
+- Add support for `--show_diff` [\#27](https://github.com/voxpupuli/beaker_puppet_helpers/pull/27) ([smortex](https://github.com/smortex))
+
+## [1.0.1](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.0.1) (2023-05-10)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/1.0.0...1.0.1)
+
+**Fixed bugs:**
+
+- puppet-modulebuilder: Allow 1.x [\#25](https://github.com/voxpupuli/beaker_puppet_helpers/pull/25) ([bastelfreak](https://github.com/bastelfreak))
+
+## [1.0.0](https://github.com/voxpupuli/beaker_puppet_helpers/tree/1.0.0) (2023-05-05)
+
+[Full Changelog](https://github.com/voxpupuli/beaker_puppet_helpers/compare/5cc9e2e0e2a6a3541502bb1aae961071a8b96157...1.0.0)
+
+**Implemented enhancements:**
+
+- Send arguments as keyword arguments & Test on Ruby 3.1 and 3.2 [\#19](https://github.com/voxpupuli/beaker_puppet_helpers/pull/19) ([ekohl](https://github.com/ekohl))
+
+**Merged pull requests:**
+
+- puppet-modulebuilder: Allow 1.x [\#23](https://github.com/voxpupuli/beaker_puppet_helpers/pull/23) ([bastelfreak](https://github.com/bastelfreak))
+- add dummy CI job we can depend on [\#22](https://github.com/voxpupuli/beaker_puppet_helpers/pull/22) ([bastelfreak](https://github.com/bastelfreak))
+- Add .vendor and vendor to .gitignore [\#21](https://github.com/voxpupuli/beaker_puppet_helpers/pull/21) ([bastelfreak](https://github.com/bastelfreak))
+- CI: Build gems with strictness and verbosity [\#20](https://github.com/voxpupuli/beaker_puppet_helpers/pull/20) ([bastelfreak](https://github.com/bastelfreak))
+- Fix RSpec/RepeatedDescription [\#18](https://github.com/voxpupuli/beaker_puppet_helpers/pull/18) ([ekohl](https://github.com/ekohl))
+- Allow beaker 4 [\#17](https://github.com/voxpupuli/beaker_puppet_helpers/pull/17) ([ekohl](https://github.com/ekohl))
+- Pass arguments as array in fact\_on [\#16](https://github.com/voxpupuli/beaker_puppet_helpers/pull/16) ([ekohl](https://github.com/ekohl))
+- Use instance doubles in tests [\#15](https://github.com/voxpupuli/beaker_puppet_helpers/pull/15) ([ekohl](https://github.com/ekohl))
+- Run acceptance tests on Ubuntu 20.04 [\#14](https://github.com/voxpupuli/beaker_puppet_helpers/pull/14) ([bastelfreak](https://github.com/bastelfreak))
+- Fix various RSpec cops before enabling rubocop-rspec [\#13](https://github.com/voxpupuli/beaker_puppet_helpers/pull/13) ([ekohl](https://github.com/ekohl))
+- Drop Ruby 2.5 and 2.6 support [\#12](https://github.com/voxpupuli/beaker_puppet_helpers/pull/12) ([ekohl](https://github.com/ekohl))
+- Make RuboCop mostly happy [\#11](https://github.com/voxpupuli/beaker_puppet_helpers/pull/11) ([ekohl](https://github.com/ekohl))
+- Simplify variable setting [\#9](https://github.com/voxpupuli/beaker_puppet_helpers/pull/9) ([ekohl](https://github.com/ekohl))
+- Use rubocop config from voxpupuli-rubocop [\#6](https://github.com/voxpupuli/beaker_puppet_helpers/pull/6) ([bastelfreak](https://github.com/bastelfreak))
+- dependabot: check for github actions and gems [\#5](https://github.com/voxpupuli/beaker_puppet_helpers/pull/5) ([bastelfreak](https://github.com/bastelfreak))
+- Add CI and release workflow [\#1](https://github.com/voxpupuli/beaker_puppet_helpers/pull/1) ([ekohl](https://github.com/ekohl))
+
+
+
+\* *This Changelog was automatically generated by [github_changelog_generator](https://github.com/github-changelog-generator/github-changelog-generator)*

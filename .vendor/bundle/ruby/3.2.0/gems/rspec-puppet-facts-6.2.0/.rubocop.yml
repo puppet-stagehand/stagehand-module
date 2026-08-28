@@ -1,0 +1,16 @@
+---
+inherit_from: .rubocop_todo.yml
+
+inherit_gem:
+  voxpupuli-rubocop: rubocop.yml
+
+Layout/LineLength:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+# To match the gem name
+Naming/FileName:
+  Exclude:
+    - 'lib/rspec-puppet-facts.rb'

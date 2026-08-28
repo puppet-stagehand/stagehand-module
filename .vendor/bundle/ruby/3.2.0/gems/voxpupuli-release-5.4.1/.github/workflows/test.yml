@@ -1,0 +1,67 @@
+---
+name: Test
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read # minimal permissions that we have to grant
+
+env:
+  BUNDLE_WITHOUT: release
+
+jobs:
+  rubocop_and_matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      ruby: ${{ steps.ruby.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Run Rubocop
+        run: bundle exec rake rubocop
+      - id: ruby
+        uses: voxpupuli/ruby-version@v2
+  test:
+    needs: rubocop_and_matrix
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ${{ fromJSON(needs.rubocop_and_matrix.outputs.ruby) }}
+    name: Ruby ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Display Ruby environment
+        run: bundle env
+      - name: check that required tasks are available
+        run: |
+          bundle exec rake --rakefile Rakefile_ci -T '^strings:generate:reference$' | grep --quiet .
+          bundle exec rake --rakefile Rakefile_ci -T '^release$' | grep --quiet .
+      - name: Verify gem builds
+        run: gem build --strict --verbose *.gemspec
+
+  tests:
+    if: always()
+    needs:
+      - rubocop_and_matrix
+      - test
+    runs-on: ubuntu-24.04
+    name: Test suite
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

@@ -1,0 +1,14 @@
+---
+# Managed by modulesync - DO NOT EDIT
+# https://voxpupuli.org/docs/updating-files-managed-with-modulesync/
+
+inherit_from: .rubocop_todo.yml
+inherit_gem:
+  voxpupuli-rubocop: rubocop.yml
+
+Naming/FileName:
+  Exclude:
+    - "*.gemspec"
+
+AllCops:
+  TargetRubyVersion: 3.2

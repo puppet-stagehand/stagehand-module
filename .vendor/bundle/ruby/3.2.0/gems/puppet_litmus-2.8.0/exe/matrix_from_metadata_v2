@@ -1,0 +1,259 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# this script creates a build matrix for github actions from the claimed supported platforms and puppet versions in metadata.json
+
+require 'json'
+
+# Sets an output variable in GitHub Actions. If the GITHUB_OUTPUT environment
+# variable is not set, this will fail with an exit code of 1 and
+# send an ::error:: message to the GitHub Actions log.
+# @param name [String] The name of the output variable
+# @param value [String] The value of the output variable
+
+def set_output(name, value)
+  # Get the output path
+  output = ENV.fetch('GITHUB_OUTPUT')
+
+  # Write the output variable to GITHUB_OUTPUT
+  File.open(output, 'a') do |f|
+    f.puts "#{name}=#{value}"
+  end
+rescue KeyError
+  puts '::error::GITHUB_OUTPUT environment variable not set.'
+  exit 1
+end
+
+IMAGE_TABLE = {
+  'RedHat-7' => 'rhel-7',
+  'RedHat-8' => 'rhel-8',
+  'RedHat-9' => 'rhel-9',
+  'RedHat-10' => 'rhel-10',
+  'SLES-12' => 'sles-12',
+  'SLES-15' => 'sles-15',
+  'Windows-2016' => 'windows-2016',
+  'Windows-2019' => 'windows-2019',
+  'Windows-2022' => 'windows-2022',
+  'Windows-2025' => 'windows-2025'
+}.freeze
+
+ARM_IMAGE_TABLE = {
+  'Debian-12-arm' => 'debian-12-arm64',
+  'RedHat-9-arm' => 'rhel-9-arm64',
+  'RedHat-10-arm' => 'rhel-10-arm64',
+  'Ubuntu-22.04-arm' => 'ubuntu-2204-lts-arm64',
+  'Ubuntu-24.04-arm' => 'ubuntu-2404-lts-arm64'
+}.freeze
+
+DOCKER_PLATFORMS = {
+  'AmazonLinux-2' => 'litmusimage/amazonlinux:2',
+  'AmazonLinux-2023' => 'litmusimage/amazonlinux:2023',
+  'CentOS-7' => 'litmusimage/centos:7',
+  'CentOS-8' => 'litmusimage/centos:stream8', # Support officaly moved to Stream8, metadata is being left as is
+  'CentOS-9' => 'litmusimage/centos:stream9',
+  'Rocky-8' => 'litmusimage/rockylinux:8',
+  'Rocky-9' => 'litmusimage/rockylinux:9',
+  'AlmaLinux-8' => 'litmusimage/almalinux:8',
+  'AlmaLinux-9' => 'litmusimage/almalinux:9',
+  'Debian-10' => 'litmusimage/debian:10',
+  'Debian-11' => 'litmusimage/debian:11',
+  'Debian-12' => 'litmusimage/debian:12',
+  'Debian-13' => 'litmusimage/debian:13',
+  'OracleLinux-7' => 'litmusimage/oraclelinux:7',
+  'OracleLinux-8' => 'litmusimage/oraclelinux:8',
+  'OracleLinux-9' => 'litmusimage/oraclelinux:9',
+  'Scientific-7' => 'litmusimage/scientificlinux:7',
+  'Ubuntu-18.04' => 'litmusimage/ubuntu:18.04',
+  'Ubuntu-20.04' => 'litmusimage/ubuntu:20.04',
+  'Ubuntu-22.04' => 'litmusimage/ubuntu:22.04',
+  'Ubuntu-24.04' => 'litmusimage/ubuntu:24.04'
+}.freeze
+
+# This table uses the latest version in each collection for accurate
+# comparison when evaluating puppet requirements from the metadata
+COLLECTION_TABLE = [
+  {
+    puppet_maj_version: 7,
+    ruby_version: 2.7
+  },
+  {
+    puppet_maj_version: 8,
+    ruby_version: 3.2
+  }
+].freeze
+
+matrix = {
+  platforms: [],
+  collection: []
+}
+
+spec_matrix = {
+  include: []
+}
+
+if ARGV.include?('--exclude-platforms')
+  exclude_platforms_occurencies = ARGV.count { |arg| arg == '--exclude-platforms' }
+  raise '--exclude-platforms argument should be present just one time in the command' unless exclude_platforms_occurencies <= 1
+
+  exclude_platforms_list = ARGV[ARGV.find_index('--exclude-platforms') + 1]
+  raise 'you need to provide a list of platforms in JSON format' if exclude_platforms_list.nil?
+
+  begin
+    exclude_list = JSON.parse(exclude_platforms_list).map(&:downcase)
+  rescue JSON::ParserError
+    raise 'the exclude platforms list must valid JSON'
+  end
+else
+  exclude_list = []
+end
+
+# Force the use of the provision_service provisioner, if the --provision-service argument is present
+if ARGV.include?('--provision-service')
+  provision_service_occurrences = ARGV.count { |arg| arg == '--provision-service' }
+  raise 'the --provision-service argument should be present just one time in the command' unless provision_service_occurrences <= 1
+
+  # NOTE: that the below are the only available images for the provision service
+  updated_platforms = {
+    'AlmaLinux-8' => 'almalinux-cloud/almalinux-8',
+    'AlmaLinux-9' => 'almalinux-cloud/almalinux-9',
+    'CentOS-7' => 'centos-7',
+    'CentOS-8' => 'centos-stream-8',
+    'CentOS-9' => 'centos-stream-9',
+    'Rocky-8' => 'rocky-linux-cloud/rocky-linux-8',
+    'Rocky-9' => 'rocky-linux-cloud/rocky-linux-9',
+    'Debian-10' => 'debian-10',
+    'Debian-11' => 'debian-11',
+    'Debian-12' => 'debian-12',
+    'Debian-13' => 'debian-13',
+    'Ubuntu-20.04' => 'ubuntu-2004-lts',
+    'Ubuntu-22.04' => 'ubuntu-2204-lts',
+    'Ubuntu-24.04' => 'ubuntu-2404-lts'
+  }
+  updated_list = IMAGE_TABLE.dup.clone
+  updated_list.merge!(updated_platforms)
+
+  IMAGE_TABLE = updated_list.freeze
+  DOCKER_PLATFORMS = {}.freeze
+end
+
+# disable provision service if repository owner is not puppetlabs
+unless ['puppetlabs', nil].include?(ENV.fetch('GITHUB_REPOSITORY_OWNER', nil))
+  IMAGE_TABLE = {}.freeze
+  ARM_IMAGE_TABLE = {}.freeze
+end
+
+metadata_path = ENV['TEST_MATRIX_FROM_METADATA'] || 'metadata.json'
+metadata = JSON.parse(File.read(metadata_path))
+
+# Allow the user to pass a file containing a custom matrix
+if ARGV.include?('--custom-matrix')
+  custom_matrix_occurrences = ARGV.count { |arg| arg == '--custom-matrix' }
+  raise '--custom-matrix argument should be present just one time in the command' unless custom_matrix_occurrences <= 1
+
+  file_path = ARGV[ARGV.find_index('--custom-matrix') + 1]
+  raise 'no file path specified' if file_path.nil?
+
+  begin
+    custom_matrix = JSON.parse(File.read(file_path))
+  rescue StandardError => e
+    case e
+    when JSON::ParserError
+      raise 'the matrix must be an array of valid JSON objects'
+    when Errno::ENOENT
+      raise "File not found: #{e.message}"
+    else
+      raise "An unknown exception occurred: #{e.message}"
+    end
+  end
+  custom_matrix.each do |platform|
+    matrix[:platforms] << platform
+  end
+else
+  # Set platforms based on declared operating system support
+  metadata['operatingsystem_support'].sort_by { |a| a['operatingsystem'] }.each do |sup|
+    os = sup['operatingsystem']
+    sup['operatingsystemrelease'].sort_by(&:to_i).each do |ver|
+      image_key = "#{os}-#{ver}"
+      # Add ARM images if they exist and are not excluded
+      if ARM_IMAGE_TABLE.key?("#{image_key}-arm") && !exclude_list.include?("#{image_key.downcase}-arm")
+        matrix[:platforms] << {
+          label: "#{image_key}-arm",
+          provider: 'provision_service',
+          image: ARM_IMAGE_TABLE["#{image_key}-arm"]
+        }
+      end
+      if IMAGE_TABLE.key?(image_key) && !exclude_list.include?(image_key.downcase)
+        matrix[:platforms] << {
+          label: image_key,
+          provider: 'provision_service',
+          image: IMAGE_TABLE[image_key]
+        }
+      elsif DOCKER_PLATFORMS.key?(image_key) && !exclude_list.include?(image_key.downcase)
+        matrix[:platforms] << {
+          label: image_key,
+          provider: 'docker',
+          image: DOCKER_PLATFORMS[image_key]
+        }
+      else
+        puts "::warning::#{image_key} was excluded from testing" if exclude_list.include?(image_key.downcase)
+        puts "::warning::Cannot find image for #{image_key}" unless exclude_list.include?(image_key.downcase)
+      end
+    end
+  end
+end
+
+# Set collections based on puppet version requirements
+if metadata.key?('requirements') && metadata['requirements'].length.positive?
+  metadata['requirements'].each do |req|
+    next unless req.key?('name') && req.key?('version_requirement') && req['name'] == 'puppet'
+
+    ver_regexp = /^([>=<]{1,2})\s*([\d.]+)\s+([>=<]{1,2})\s*([\d.]+)$/
+    match = ver_regexp.match(req['version_requirement'])
+    if match.nil?
+      puts "::warning::Didn't recognize version_requirement '#{req['version_requirement']}'"
+      break
+    end
+
+    cmp_one, ver_one, cmp_two, ver_two = match.captures
+    reqs = ["#{cmp_one} #{ver_one}", "#{cmp_two} #{ver_two}"]
+
+    COLLECTION_TABLE.each do |collection|
+      # Test against the "largest" puppet version in a collection, e.g. `7.9999` to allow puppet requirements with a non-zero lower bound on minor/patch versions.
+      # This assumes that such a boundary will always allow the latest actually existing puppet version of a release stream, trading off simplicity vs accuracy here.
+      next unless Gem::Requirement.create(reqs).satisfied_by?(Gem::Version.new("#{collection[:puppet_maj_version]}.9999"))
+
+      matrix[:collection] << "puppetcore#{collection[:puppet_maj_version]}"
+
+      include_version = {
+        8 => "~> #{collection[:puppet_maj_version]}.0",
+        7 => "~> #{collection[:puppet_maj_version]}.24",
+        6 => "~> #{collection[:puppet_maj_version]}.0"
+      }
+      spec_matrix[:include] << { puppet_version: include_version[collection[:puppet_maj_version]], ruby_version: collection[:ruby_version] }
+    end
+  end
+end
+
+puts '::warning::matrix_from_metadata_v2 is now deprecated and will be removed in puppet_litmus v3, please migrate to matrix_from_metadata_v3.'
+# Set to defaults (all collections) if no matches are found
+if matrix[:collection].empty?
+  COLLECTION_TABLE.map do |collection|
+    version = collection[:puppet_maj_version]
+    prefix = version == 7 ? 'puppet' : 'puppetcore'
+    "#{prefix}#{version}-nightly"
+  end
+end
+
+# Just to make sure there aren't any duplicates
+matrix[:platforms] = matrix[:platforms].uniq.sort_by { |a| a[:label] } unless ARGV.include?('--custom-matrix')
+matrix[:collection] = matrix[:collection].uniq.sort
+
+set_output('matrix', JSON.generate(matrix))
+set_output('spec_matrix', JSON.generate(spec_matrix))
+
+acceptance_test_cell_count = matrix[:platforms].length * matrix[:collection].length
+spec_test_cell_count = spec_matrix[:include].length
+
+puts "Created matrix with #{acceptance_test_cell_count + spec_test_cell_count} cells:"
+puts "  - Acceptance Test Cells: #{acceptance_test_cell_count}"
+puts "  - Spec Test Cells: #{spec_test_cell_count}"

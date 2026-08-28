@@ -1,0 +1,125 @@
+---
+name: Test
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  rubocop_and_matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      ruby: ${{ steps.ruby.outputs.versions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ruby 4.0
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - name: Run Rubocop
+        run: bundle exec rake rubocop
+      - id: ruby
+        uses: voxpupuli/ruby-version@be0467ce7366d206b2e87f5b7a032a030120b7cb # 2.0.0
+
+  rspec:
+    runs-on: ubuntu-24.04
+    needs: rubocop_and_matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ${{ fromJSON(needs.rubocop_and_matrix.outputs.ruby) }}
+    name: RSpec - Ruby ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: spec tests
+        run: bundle exec rake test:spec
+      - name: Build gem
+        run: gem build --strict --verbose *.gemspec
+
+  docker:
+    runs-on: ubuntu-24.04
+    needs: rubocop_and_matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ${{ fromJSON(needs.rubocop_and_matrix.outputs.ruby) }}
+    name: Docker on Ruby ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Run acceptance tests
+        run: bundle exec rake test:acceptance
+
+  # this job is currently broken because puppet/puppet-dev-tools:2023-02-24-1bca42e is too old
+  #beaker_in_container:
+  #  runs-on: ubuntu-24.04
+  #  needs: rubocop_and_matrix
+  #  name: Docker - Beaker in container connection test
+  #  steps:
+  #    - uses: actions/checkout@v7
+  #    # use this and not container key from gha to not have a docker network from github
+  #    - name: Run Beaker in docker container
+  #      uses: addnab/docker-run-action@v3
+  #      with:
+  #          image: puppet/puppet-dev-tools:2023-02-24-1bca42e
+  #          options: -v ${{ github.workspace }}:/work
+  #          run: |
+  #            cd /work
+  #            ls -la
+  #            bundle install
+  #            export DOCKER_IN_DOCKER=true
+  #            bundle exec rake test:acceptance
+
+  # verifies that podman service is a dropin replacement for docker
+  podman:
+    runs-on: ubuntu-24.04
+    needs: rubocop_and_matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ${{ fromJSON(needs.rubocop_and_matrix.outputs.ruby) }}
+    name: Podman on Ruby ${{ matrix.ruby }}
+    steps:
+      - name: Start podman
+        run: |
+          sudo systemctl stop docker.service docker.socket && systemctl start --user podman.socket
+          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Run acceptance tests
+        run: bundle exec rake test:acceptance
+
+  tests:
+    if: always()
+    needs:
+      - rubocop_and_matrix
+      - docker
+      # - beaker_in_container
+      - podman
+      - rspec
+    runs-on: ubuntu-24.04
+    name: Test suite
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

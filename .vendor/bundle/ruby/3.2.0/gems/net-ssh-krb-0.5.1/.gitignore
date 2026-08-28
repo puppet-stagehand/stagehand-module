@@ -1,0 +1,10 @@
+*.sw?
+.buildpath
+.project
+.DS_Store
+coverage
+doc
+rdoc
+pkg
+Capfile
+Gemfile.lock
