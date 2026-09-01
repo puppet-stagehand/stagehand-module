@@ -325,11 +325,32 @@ class stagehand::console (
     # command and its idempotency guard below.
     $pg_hba_file_cmd = "su - postgres -c \"psql -tAc 'SHOW hba_file'\" | tr -d '[:space:]'"
 
+    # Puppet's exec provider validates `command` by taking its FIRST
+    # whitespace-delimited word and requiring it to resolve to a real
+    # executable -- it does not invoke a shell to run the command string
+    # itself. A raw shell script starting with a variable assignment
+    # (`PG_HBA_FILE=$(...)`) fails that check outright with "Could not
+    # find command 'PG_HBA_FILE=$(su'" before Puppet ever attempts to run
+    # anything. Writing the script to a file and invoking it via `/bin/sh
+    # <path>` sidesteps this entirely, and also avoids nesting the
+    # already-quoted $pg_hba_file_cmd (which itself contains both single
+    # and double quotes) inside a second layer of shell quoting.
+    $pg_hba_script = "${pg_state_dir}/pg_hba.sh"
+
+    file { $pg_hba_script:
+      ensure  => file,
+      owner   => 'postgres',
+      group   => 'postgres',
+      mode    => '0700',
+      content => "#!/bin/sh\nset -e\nPG_HBA_FILE=\$(${pg_hba_file_cmd})\ncat >> \"\${PG_HBA_FILE}\" <<RULES\n# puppet-console: console local TCP auth\nhost    ${db_name}    ${db_user}    127.0.0.1/32    scram-sha-256\nhost    ${db_name}    ${db_user}    ::1/128         scram-sha-256\nRULES\n",
+      require => File[$pg_state_dir],
+    }
+
     exec { 'stagehand::console::pg_hba':
-      command => "PG_HBA_FILE=\$(${pg_hba_file_cmd}) && cat >> \${PG_HBA_FILE} <<'RULES'\n# puppet-console: console local TCP auth\nhost    ${db_name}    ${db_user}    127.0.0.1/32    scram-sha-256\nhost    ${db_name}    ${db_user}    ::1/128         scram-sha-256\nRULES\n",
+      command => "/bin/sh ${pg_hba_script}",
       unless  => "grep -q 'puppet-console' \$(${pg_hba_file_cmd})",
       path    => $pg_exec_path,
-      require => Exec['stagehand::console::pg_db'],
+      require => [Exec['stagehand::console::pg_db'], File[$pg_hba_script]],
       notify  => Exec['stagehand::console::pg_hba_reload'],
     }
 
