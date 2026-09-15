@@ -5,12 +5,31 @@ require 'spec_helper'
 # Covers stagehand::console::k3s -- the manifests-directory-rendering
 # sibling of stagehand::console::docker (see console_docker_spec.rb).
 # No hand-rolled Exec, no Kubernetes/Helm CLI invocation anywhere: this
-# class's entire job is rendering Hiera-supplied values into two `file`
-# resources that k3s's own helm-controller reconciles.
+# class's entire job is rendering Hiera-supplied values into `file`
+# resources that k3s's own helm-controller / manifest-deploy controller
+# reconciles.
+#
+# Plan 02 expands Plan 01's Zot-only tracer to the full Console profile:
+# the console workload and PostgreSQL (CloudNativePG), plus the first
+# Kubernetes Secret this class renders (db password, ingest token,
+# dataservice token) -- the secret-handling path Zot's own configuration
+# never exercised.
 describe 'stagehand::console::k3s' do
+  let(:valid_image_ref) do
+    "ghcr.io/puppet-stagehand/console@sha256:#{'a' * 64}"
+  end
+
+  let(:test_db_password) { 's3cr3t-db-password' }
+  let(:test_ingest_token) { 's3cr3t-ingest-token' }
+  let(:test_dataservice_token) { 's3cr3t-dataservice-token' }
+
   let(:required_params) do
     {
-      'sizing_tier' => 'small',
+      'sizing_tier'        => 'small',
+      'image_ref'          => valid_image_ref,
+      'db_password'        => sensitive(test_db_password),
+      'ingest_token'       => sensitive(test_ingest_token),
+      'dataservice_token'  => sensitive(test_dataservice_token),
     }
   end
 
@@ -24,6 +43,8 @@ describe 'stagehand::console::k3s' do
         it { is_expected.to compile.with_all_deps }
 
         it { is_expected.to contain_class('stagehand::console::k3s') }
+
+        # --- Plan 01's two Zot resources, unchanged ---
 
         it {
           is_expected.to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-zot.yaml')
@@ -52,10 +73,94 @@ describe 'stagehand::console::k3s' do
             .with_content(%r{Ingress})
         }
 
+        # --- Plan 02's three new resources: console, PostgreSQL, Secret ---
+
+        it {
+          is_expected.to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')
+            .with_ensure('file')
+            .with_owner('root')
+            .with_group('root')
+            .with_mode('0644')
+        }
+
+        it {
+          is_expected.to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-postgresql.yaml')
+            .with_ensure('file')
+            .with_owner('root')
+            .with_group('root')
+            .with_mode('0644')
+        }
+
+        it 'renders exactly five File resources under manifests_dir' do
+          file_resources = catalogue.resources.select do |r|
+            r.type == 'File' && r.title.to_s.start_with?('/var/lib/rancher/k3s/server/manifests/')
+          end
+          expect(file_resources.length).to eq(5)
+        end
+
         it 'declares no Exec resource for the apply loop' do
           catalogue.resources.each do |resource|
             expect(resource.type).not_to eq('Exec')
           end
+        end
+
+        describe 'the Secret manifest' do
+          subject { catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-secrets.yaml') }
+
+          it { is_expected.to exist }
+          it { is_expected.to be_ensure('file') }
+          it { is_expected.to be_owner('root') }
+          it { is_expected.to be_group('root') }
+
+          it 'is mode 0600' do
+            expect(subject[:mode]).to eq('0600')
+          end
+
+          it 'suppresses Puppet diff output' do
+            expect(subject[:show_diff]).to eq(false)
+          end
+
+          it 'renders the three secret values via stringData' do
+            content = subject[:content]
+            expect(content).to include(test_db_password)
+            expect(content).to include(test_ingest_token)
+            expect(content).to include(test_dataservice_token)
+            expect(content).to include('stagehand-console-secrets')
+          end
+        end
+
+        it 'is the only File resource carrying secret material (mode 0600)' do
+          mode_0600 = catalogue.resources.select { |r| r.type == 'File' && r[:mode] == '0600' }
+          expect(mode_0600.length).to eq(1)
+        end
+
+        it 'is the only File resource with show_diff set' do
+          with_show_diff = catalogue.resources.select { |r| r.type == 'File' && !r[:show_diff].nil? }
+          expect(with_show_diff.length).to eq(1)
+        end
+
+        it 'does not leak the database password into the console manifest' do
+          console_content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')[:content]
+          expect(console_content).not_to include(test_db_password)
+          expect(console_content).not_to include(test_ingest_token)
+          expect(console_content).not_to include(test_dataservice_token)
+        end
+
+        it 'does not leak the database password into the PostgreSQL manifest' do
+          pg_content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-postgresql.yaml')[:content]
+          expect(pg_content).not_to include(test_db_password)
+        end
+
+        it "the console manifest references the Secret by name (secretKeyRef)" do
+          console_content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')[:content]
+          expect(console_content).to match(%r{secretKeyRef})
+          expect(console_content).to match(%r{stagehand-console-secrets})
+          expect(console_content).to match(%r{PSH_DATABASE_URL})
+        end
+
+        it 'the console image is rendered from the typed, digest-pinned $image_ref' do
+          console_content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')[:content]
+          expect(console_content).to include("sha256:#{'a' * 64}")
         end
       end
 
@@ -69,7 +174,15 @@ describe 'stagehand::console::k3s' do
         }
 
         it {
-          is_expected.to contain_file('/opt/stagehand-lab-manifests/stagehand-zot-networkpolicy.yaml')
+          is_expected.to contain_file('/opt/stagehand-lab-manifests/stagehand-console.yaml')
+        }
+
+        it {
+          is_expected.to contain_file('/opt/stagehand-lab-manifests/stagehand-postgresql.yaml')
+        }
+
+        it {
+          is_expected.to contain_file('/opt/stagehand-lab-manifests/stagehand-secrets.yaml')
         }
 
         it {
@@ -87,6 +200,42 @@ describe 'stagehand::console::k3s' do
         # it does not retract already-applied k8s resources.
         it { is_expected.not_to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-zot.yaml') }
         it { is_expected.not_to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-zot-networkpolicy.yaml') }
+        it { is_expected.not_to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml') }
+        it { is_expected.not_to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-postgresql.yaml') }
+        it { is_expected.not_to contain_file('/var/lib/rancher/k3s/server/manifests/stagehand-secrets.yaml') }
+
+        it 'declares none of the five File resources' do
+          file_resources = catalogue.resources.select do |r|
+            r.type == 'File' && r.title.to_s.start_with?('/var/lib/rancher/k3s/server/manifests/')
+          end
+          expect(file_resources).to be_empty
+        end
+      end
+
+      context 'sizing tier changes the rendered resource requests' do
+        it 'differs between small and medium across all three services' do
+          small_catalogue = compile_to_catalog(pp_class('small'), os_facts)
+          medium_catalogue = compile_to_catalog(pp_class('medium'), os_facts)
+
+          %w[stagehand-console.yaml stagehand-postgresql.yaml stagehand-zot.yaml].each do |file|
+            path = "/var/lib/rancher/k3s/server/manifests/#{file}"
+            small_content = small_catalogue.resource('File', path)[:content]
+            medium_content = medium_catalogue.resource('File', path)[:content]
+            expect(small_content).not_to eq(medium_content)
+          end
+        end
+
+        def pp_class(tier)
+          <<~PUPPET
+            class { 'stagehand::console::k3s':
+              sizing_tier       => '#{tier}',
+              image_ref         => '#{valid_image_ref}',
+              db_password       => Sensitive('#{test_db_password}'),
+              ingest_token      => Sensitive('#{test_ingest_token}'),
+              dataservice_token => Sensitive('#{test_dataservice_token}'),
+            }
+          PUPPET
+        end
       end
     end
   end
@@ -115,6 +264,33 @@ describe 'stagehand::console::k3s' do
 
     it 'fails to compile with a message naming the deliberate omission' do
       expect { catalogue }.to raise_error(Puppet::Error, %r{k3s installation is deliberately unimplemented})
+    end
+  end
+
+  context 'with a malformed image_ref (no digest suffix)' do
+    let(:facts) { on_supported_os.first[1] }
+    let(:params) { required_params.merge('image_ref' => 'ghcr.io/puppet-stagehand/console:latest') }
+
+    it 'fails to compile' do
+      expect { catalogue }.to raise_error(Puppet::Error, %r{image_ref})
+    end
+  end
+
+  context 'with a malformed image_ref (non-hex digest)' do
+    let(:facts) { on_supported_os.first[1] }
+    let(:params) { required_params.merge('image_ref' => "ghcr.io/puppet-stagehand/console@sha256:#{'z' * 64}") }
+
+    it 'fails to compile' do
+      expect { catalogue }.to raise_error(Puppet::Error, %r{image_ref})
+    end
+  end
+
+  context 'with a malformed image_ref (short digest)' do
+    let(:facts) { on_supported_os.first[1] }
+    let(:params) { required_params.merge('image_ref' => "ghcr.io/puppet-stagehand/console@sha256:#{'a' * 10}") }
+
+    it 'fails to compile' do
+      expect { catalogue }.to raise_error(Puppet::Error, %r{image_ref})
     end
   end
 end
