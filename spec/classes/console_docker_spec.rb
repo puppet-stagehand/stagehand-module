@@ -4,6 +4,15 @@ require 'spec_helper'
 
 # Covers stagehand::console::docker -- the container-lifecycle sibling of
 # stagehand::console (see console_spec.rb).
+#
+# D-04 regression net (puppet-console Phase 999.22): stagehand::console::k3s
+# is purely additive for NEW installs -- it does not supersede this class at
+# the code level, and converting an existing docker::run-based deployment to
+# k3s in place is explicitly out of scope for that phase. This spec is the
+# mechanical proof that Phase 999.22's plans left this class byte-identical;
+# a future reader who sees two console deployment classes (docker.pp and
+# k3s.pp) should understand neither one supersedes the other in code -- the
+# docker path remains the fully-supported path for existing installs.
 describe 'stagehand::console::docker' do
   let(:valid_image_ref) do
     "ghcr.io/puppet-stagehand/console@sha256:#{'a' * 64}"
