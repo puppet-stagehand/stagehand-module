@@ -1,0 +1,42 @@
+<%- | String[1] $namespace,
+      String[1] $chart,
+      String[1] $chart_version,
+      String[1] $app_version,
+      Stagehand::K3s::Sizing_tier $sizing_tier,
+| -%>
+<%
+# Resource-request profile keyed on sizing tier (appliance ADR 0006's three
+# recorded tiers) -- the Zot chart's only tier-scalable knob is its PVC
+# storage size, so that is what this profile adjusts. One template, not
+# three, per PATTERNS.md guidance.
+$pvc_storage = $sizing_tier ? {
+  'small'  => '5Gi',
+  'medium' => '20Gi',
+  'large'  => '50Gi',
+}
+-%>
+# Managed by stagehand::console::k3s -- do not edit by hand.
+# Canonical content owned by stagehand-appliance/manifests/base/zot/zot-helmchart.yaml
+# (D-02); this template only interpolates Hiera-supplied values into that
+# same structure.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: stagehand-zot
+  namespace: kube-system
+spec:
+  chart: <%= $chart %>
+  version: "<%= $chart_version %>"
+  targetNamespace: <%= $namespace %>
+  createNamespace: true
+  valuesContent: |-
+    image:
+      tag: "<%= $app_version %>"
+    service:
+      type: ClusterIP
+      port: 5000
+    persistence: true
+    pvc:
+      create: true
+      accessModes: ["ReadWriteOnce"]
+      storage: <%= $pvc_storage %>

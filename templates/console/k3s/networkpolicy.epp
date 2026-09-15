@@ -1,0 +1,25 @@
+<%- | String[1] $namespace,
+| -%>
+# Managed by stagehand::console::k3s -- do not edit by hand.
+# Canonical content owned by stagehand-appliance/manifests/base/zot/networkpolicy.yaml
+# (D-02); this template only interpolates Hiera-supplied values into that
+# same structure.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stagehand-zot-default-deny-ingress
+  namespace: <%= $namespace %>
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zot
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: stagehand-console
+      ports:
+        - protocol: TCP
+          port: 5000

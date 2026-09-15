@@ -10,6 +10,8 @@
 * [`stagehand::compilers`](#stagehand--compilers): Let every compile server encrypt for any agent (node_encrypt).
 * [`stagehand::console`](#stagehand--console): Install and run the Puppet Stagehand Console service itself.
 * [`stagehand::console::docker`](#stagehand--console--docker): Run the Puppet Stagehand Console as a digest-pinned Docker container.
+* [`stagehand::console::k3s`](#stagehand--console--k3s): Render the Console profile's Zot registry from Hiera into the
+k3s manifests directory, where k3s's own helm-controller reconciles it.
 * [`stagehand::console_integration`](#stagehand--console_integration): Wire a puppetserver primary to the Puppet Stagehand Console.
 * [`stagehand::platform_lock`](#stagehand--platform_lock): Converge one approved Puppet package release set for one or more VM roles.
 * [`stagehand::platform_lock::apt`](#stagehand--platform_lock--apt): Apply exact APT package versions, preferences, and native holds.
@@ -31,6 +33,8 @@
 ### Data types
 
 * [`Stagehand::Docker_image_ref`](#Stagehand--Docker_image_ref): A fully-qualified, digest-pinned Docker image reference.
+* [`Stagehand::K3s::Sizing_tier`](#Stagehand--K3s--Sizing_tier): The appliance's operator-chosen sizing tier for a k3s-hosted
+Console deployment.
 
 ### Tasks
 
@@ -502,6 +506,156 @@ the engine is already managed elsewhere (e.g. an operator's own
 pre-existing `docker` classification).
 
 Default value: `true`
+
+### <a name="stagehand--console--k3s"></a>`stagehand::console::k3s`
+
+The manifests-directory-rendering sibling of `stagehand::console::docker`
+-- same repo, same `$ensure` parameter-naming convention, but a
+completely different delivery mechanism: this class declares NO
+`docker::image`/`docker::run` and NO hand-rolled `Exec` for the apply
+loop. It writes two `file` resources into `$manifests_dir` and stops --
+k3s's own bundled helm-controller watches that directory for HelmChart
+and NetworkPolicy manifests and reconciles them on file change (D-05,
+RESEARCH.md Architecture Pattern 2). Applied via a real `bolt apply()` of
+a compiled catalog (D-05's agentless mechanism), never a persistent
+puppet-agent pull relationship against the appliance itself.
+
+Zot is this plan's tracer payload -- the simplest of the three
+console-profile services (no database, no secrets in its default
+configuration). PostgreSQL and the console itself are Plan 02's expansion
+out from this same pattern.
+
+## Known, disclosed gap: k3s install/lifecycle is out of scope (D-05)
+Ignition bakes k3s into the appliance image at build time, so this class
+carries ZERO k3s installation/lifecycle logic -- there is nothing to
+install on the only target this phase has. This resolves
+999.22-RESEARCH.md Open Question 2 to "not needed." `$manage_k3s`
+defaults to `false`; flipping it to `true` fails catalog compilation
+rather than silently doing nothing, because a real non-appliance target
+for that escape hatch has not been confirmed yet -- a future phase should
+implement it deliberately, not have a reader assume it was forgotten.
+
+## Known, disclosed gap: `ensure => 'absent'` does not retract applied resources
+Passing `ensure => 'absent'` stops this class from declaring either
+rendered `File` resource at all -- Puppet simply stops managing them
+going forward. Removing a file from the k3s manifests directory does NOT
+retract Kubernetes resources k3s already applied from it; k3s's
+apply-on-change mechanism has no observed retract-on-delete behavior.
+This mirrors `stagehand::console::docker`'s own disclosed
+`ensure => 'absent'` gap (RESEARCH.md Pitfall 3): an operator who wants
+the workload actually gone needs a separate deliberate removal step, not
+just this ensure flip.
+
+#### Examples
+
+##### Hiera-driven Zot render
+
+```puppet
+class { 'stagehand::console::k3s':
+  # sizing_tier supplied via Hiera: stagehand::console::k3s::sizing_tier
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `stagehand::console::k3s` class:
+
+* [`sizing_tier`](#-stagehand--console--k3s--sizing_tier)
+* [`ensure`](#-stagehand--console--k3s--ensure)
+* [`manifests_dir`](#-stagehand--console--k3s--manifests_dir)
+* [`namespace`](#-stagehand--console--k3s--namespace)
+* [`zot_chart`](#-stagehand--console--k3s--zot_chart)
+* [`zot_chart_version`](#-stagehand--console--k3s--zot_chart_version)
+* [`zot_app_version`](#-stagehand--console--k3s--zot_app_version)
+* [`manage_k3s`](#-stagehand--console--k3s--manage_k3s)
+
+##### <a name="-stagehand--console--k3s--sizing_tier"></a>`sizing_tier`
+
+Data type: `Stagehand::K3s::Sizing_tier`
+
+The operator-chosen sizing tier (D-03), type-constrained by
+`Stagehand::K3s::Sizing_tier`. No compiled-in default -- supplied via
+Hiera automatic parameter lookup
+(`stagehand::console::k3s::sizing_tier`), matching
+`stagehand::console::docker::image_ref`'s GitOps trigger model. An
+unknown tier name fails catalog compilation rather than silently
+rendering a wrong resource profile.
+
+##### <a name="-stagehand--console--k3s--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+'present' declares and renders the Zot manifest files; 'absent' stops
+this class from declaring them at all (see the disclosed gap above --
+this does NOT actively retract already-applied Kubernetes resources).
+Deliberately no 'latest' value here, matching `docker.pp`'s own
+digest/version-pinning divergence.
+
+Default value: `'present'`
+
+##### <a name="-stagehand--console--k3s--manifests_dir"></a>`manifests_dir`
+
+Data type: `Stdlib::Absolutepath`
+
+Absolute path to the k3s manifests directory this class renders files
+into. Defaults to k3s's own packaged-components path
+(`/var/lib/rancher/k3s/server/manifests`); overridable for lab/test
+targets (this plan's own k3d harness overrides it to a bind-mounted
+subdirectory).
+
+Default value: `'/var/lib/rancher/k3s/server/manifests'`
+
+##### <a name="-stagehand--console--k3s--namespace"></a>`namespace`
+
+Data type: `String[1]`
+
+Kubernetes namespace the rendered Zot workload and its NetworkPolicy
+target (`spec.targetNamespace` on the HelmChart CR, and the
+NetworkPolicy's own `metadata.namespace`).
+
+Default value: `'stagehand'`
+
+##### <a name="-stagehand--console--k3s--zot_chart"></a>`zot_chart`
+
+Data type: `String[1]`
+
+OCI reference for the Zot Helm chart. Defaults to the project's own
+official chart (appliance ADR 0007's explicit choice for its
+signature-aware search, break-glass UI and sync features) -- this
+class does not reopen that choice.
+
+Default value: `'oci://ghcr.io/project-zot/helm-charts/zot'`
+
+##### <a name="-stagehand--console--k3s--zot_chart_version"></a>`zot_chart_version`
+
+Data type: `String[1]`
+
+Pinned Zot Helm chart version. Sourced from
+`stagehand-appliance/build/versions.env`'s `ZOT_CHART_VERSION` -- one
+pinned source of truth across both repos, never two drifting pins.
+
+Default value: `'0.1.124'`
+
+##### <a name="-stagehand--console--k3s--zot_app_version"></a>`zot_app_version`
+
+Data type: `String[1]`
+
+Pinned Zot registry image version (the chart's `image.tag` override).
+Sourced from `stagehand-appliance/build/versions.env`'s `ZOT_VERSION`.
+
+Default value: `'v2.1.21'`
+
+##### <a name="-stagehand--console--k3s--manage_k3s"></a>`manage_k3s`
+
+Data type: `Boolean`
+
+Escape hatch mirroring `docker.pp`'s `$manage_docker_engine` shape.
+Defaults to `false` (k3s is baked in by Ignition -- nothing to
+install). Setting `true` fails catalog compilation with a message
+naming this deliberate omission rather than silently doing nothing --
+see the disclosed gap above.
+
+Default value: `false`
 
 ### <a name="stagehand--console_integration"></a>`stagehand::console_integration`
 
@@ -987,6 +1141,35 @@ capitalized) -- confirmed against this same module's fixture copy of
 `puppetlabs/apt`'s `types/auth_conf_entry.pp` -> `Apt::Auth_conf_entry`.
 
 Alias of `Pattern[/\A\S+@sha256:[0-9a-f]{64}\z/]`
+
+### <a name="Stagehand--K3s--Sizing_tier"></a>`Stagehand::K3s::Sizing_tier`
+
+A first-class, type-constrained Hiera value (D-03) -- an operator choice,
+never auto-detected from host resources. The Hiera key an operator sets
+is `stagehand::console::k3s::sizing_tier`, reachable by automatic
+class-parameter lookup exactly like `stagehand::console::docker::image_ref`
+already is. Per D-03, the appliance's first-boot setup wizard is meant to
+collect this value directly -- that wizard does not exist yet (it is
+`stagehand-appliance/ROADMAP.md` Phase 4, two phases after this one), so
+this type exists to make the value a typed, Hiera-addressable class
+parameter now, ready for the wizard to write once it ships.
+
+Maps to appliance ADR 0006's three recorded tiers:
+  - `small`:  the target-customer tier (4 vCPU / 8 GiB / 100 GiB)
+  - `medium`: the few-thousand-node tier (8 vCPU / 16 GiB / 250 GiB)
+  - `large`:  the three-node tier with external or operator-supplied
+    PostgreSQL
+
+An unknown tier name fails catalog compilation, not a silent render of a
+wrong resource profile.
+
+Named `k3s/sizing_tier.pp` (not `types/K3sSizingTier.pp`), matching
+Puppet's file-to-typename autoloading convention documented in
+`types/docker_image_ref.pp`'s closing paragraph: path segments map to
+type-name segments verbatim, underscores preserved, only the first
+letter capitalized.
+
+Alias of `Enum['small', 'medium', 'large']`
 
 ## Tasks
 
