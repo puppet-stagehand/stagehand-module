@@ -107,10 +107,18 @@ describe 'stagehand::console::k3s' do
         describe 'the Secret manifest' do
           subject { catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-secrets.yaml') }
 
-          it { is_expected.to exist }
-          it { is_expected.to be_ensure('file') }
-          it { is_expected.to be_owner('root') }
-          it { is_expected.to be_group('root') }
+          it 'exists' do
+            expect(subject).not_to be_nil
+          end
+
+          it 'is ensure file' do
+            expect(subject[:ensure]).to eq('file')
+          end
+
+          it 'is owned by root:root' do
+            expect(subject[:owner]).to eq('root')
+            expect(subject[:group]).to eq('root')
+          end
 
           it 'is mode 0600' do
             expect(subject[:mode]).to eq('0600')
@@ -212,29 +220,44 @@ describe 'stagehand::console::k3s' do
         end
       end
 
-      context 'sizing tier changes the rendered resource requests' do
-        it 'differs between small and medium across all three services' do
-          small_catalogue = compile_to_catalog(pp_class('small'), os_facts)
-          medium_catalogue = compile_to_catalog(pp_class('medium'), os_facts)
+      context "with sizing_tier => 'small'" do
+        let(:params) { required_params.merge('sizing_tier' => 'small') }
 
-          %w[stagehand-console.yaml stagehand-postgresql.yaml stagehand-zot.yaml].each do |file|
-            path = "/var/lib/rancher/k3s/server/manifests/#{file}"
-            small_content = small_catalogue.resource('File', path)[:content]
-            medium_content = medium_catalogue.resource('File', path)[:content]
-            expect(small_content).not_to eq(medium_content)
-          end
+        it 'renders the small-tier console resource requests' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')[:content]
+          expect(content).to include('cpu: "250m"')
         end
 
-        def pp_class(tier)
-          <<~PUPPET
-            class { 'stagehand::console::k3s':
-              sizing_tier       => '#{tier}',
-              image_ref         => '#{valid_image_ref}',
-              db_password       => Sensitive('#{test_db_password}'),
-              ingest_token      => Sensitive('#{test_ingest_token}'),
-              dataservice_token => Sensitive('#{test_dataservice_token}'),
-            }
-          PUPPET
+        it 'renders the small-tier PostgreSQL storage size' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-postgresql.yaml')[:content]
+          expect(content).to include('size: 10Gi')
+        end
+
+        it 'renders the small-tier Zot storage size (Plan 01, unmodified)' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-zot.yaml')[:content]
+          expect(content).to include('storage: 5Gi')
+        end
+      end
+
+      context "with sizing_tier => 'medium'" do
+        let(:params) { required_params.merge('sizing_tier' => 'medium') }
+
+        it 'renders different console resource requests than the small tier' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-console.yaml')[:content]
+          expect(content).to include('cpu: "500m"')
+          expect(content).not_to include('cpu: "250m"')
+        end
+
+        it 'renders different PostgreSQL storage than the small tier' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-postgresql.yaml')[:content]
+          expect(content).to include('size: 50Gi')
+          expect(content).not_to include('size: 10Gi')
+        end
+
+        it 'renders different Zot storage than the small tier (Plan 01, unmodified)' do
+          content = catalogue.resource('File', '/var/lib/rancher/k3s/server/manifests/stagehand-zot.yaml')[:content]
+          expect(content).to include('storage: 20Gi')
+          expect(content).not_to include('storage: 5Gi')
         end
       end
     end

@@ -1,0 +1,73 @@
+<%- | String[1] $namespace,
+      String[1] $operator_chart,
+      String[1] $operator_chart_version,
+      String[1] $cluster_chart,
+      String[1] $cluster_chart_version,
+      String[1] $postgres_major,
+      String[1] $storage_size,
+      String[1] $cpu_request,
+      String[1] $cpu_limit,
+      String[1] $memory_request,
+      String[1] $memory_limit,
+| -%>
+# Managed by stagehand::console::k3s -- do not edit by hand.
+# Canonical content owned by
+# stagehand-appliance/manifests/base/postgresql/postgresql.yaml (D-02);
+# this template only interpolates Hiera-supplied/sizing-tier values into
+# that same two-HelmChart structure (CloudNativePG operator + the
+# `cluster` chart -- checkpoint-selected mechanism, see
+# 999.22-02-PLAN.md).
+#
+# No Sensitive value is ever passed to this template; the `psh`
+# application-owner credential is referenced by Secret name/key only
+# (stagehand-console-secrets, rendered by secrets.epp) -- never a literal
+# here. The cluster's own PostgreSQL superuser credential is left to the
+# operator's own auto-provisioning (enableSuperuserAccess with no
+# superuserSecret override), out of this Secret's scope.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cloudnative-pg
+  namespace: kube-system
+spec:
+  chart: <%= $operator_chart %>
+  version: "<%= $operator_chart_version %>"
+  targetNamespace: cnpg-system
+  createNamespace: true
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: stagehand-postgres
+  namespace: kube-system
+spec:
+  chart: <%= $cluster_chart %>
+  version: "<%= $cluster_chart_version %>"
+  targetNamespace: <%= $namespace %>
+  createNamespace: true
+  valuesContent: |-
+    fullnameOverride: stagehand-postgres
+    version:
+      postgresql: "<%= $postgres_major %>"
+    cluster:
+      instances: 1
+      storage:
+        size: <%= $storage_size %>
+      resources:
+        requests:
+          cpu: <%= $cpu_request %>
+          memory: <%= $memory_request %>
+        limits:
+          cpu: <%= $cpu_limit %>
+          memory: <%= $memory_limit %>
+      enableSuperuserAccess: true
+      initdb:
+        database: psh
+        owner: psh
+        secret:
+          name: stagehand-console-secrets
+---
+<%= epp('stagehand/console/k3s/networkpolicy.epp', {
+  'namespace' => $namespace,
+  'service'   => 'postgres',
+}) -%>

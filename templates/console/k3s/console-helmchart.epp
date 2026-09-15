@@ -1,0 +1,108 @@
+<%- | String[1] $namespace,
+      String[1] $registry_repo,
+      String[1] $image_digest,
+      Integer[1, 65535] $console_port,
+      String[1] $puppetserver_fqdn,
+      String[1] $database_url_template,
+      String[1] $cpu_request,
+      String[1] $cpu_limit,
+      String[1] $memory_request,
+      String[1] $memory_limit,
+| -%>
+# Managed by stagehand::console::k3s -- do not edit by hand.
+# Canonical content owned by
+# stagehand-appliance/manifests/base/stagehand/console.yaml (D-02); this
+# template only interpolates Hiera-supplied values into that same
+# Deployment+Service+NetworkPolicy structure (named "-helmchart.epp" for
+# consistency with this plan's file-list convention, even though its
+# content is a plain Deployment/Service -- the console has no published
+# Helm chart of its own, ADR 0006).
+#
+# No Sensitive value is ever passed to this template -- the database
+# password reaches the container only via a secretKeyRef'd
+# PSH_DB_PASSWORD env var that Kubernetes substitutes into
+# PSH_DATABASE_URL's $(PSH_DB_PASSWORD) placeholder at container start
+# (see secrets.epp, which renders the stagehand-console-secrets Secret
+# this file references by name and key only).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stagehand-console
+  namespace: <%= $namespace %>
+  labels:
+    app.kubernetes.io/name: stagehand-console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stagehand-console
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stagehand-console
+    spec:
+      containers:
+        - name: stagehand-console
+          image: "<%= $registry_repo %>@<%= $image_digest %>"
+          ports:
+            - name: https
+              containerPort: <%= $console_port %>
+          env:
+            - name: PSH_ADDR
+              value: ":<%= $console_port %>"
+            - name: PSH_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: stagehand-console-secrets
+                  key: password
+            - name: PSH_DATABASE_URL
+              value: "<%= $database_url_template %>"
+            - name: PSH_INGEST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: stagehand-console-secrets
+                  key: ingest-token
+            - name: PSH_DATASERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: stagehand-console-secrets
+                  key: dataservice-token
+            - name: PSH_EXTERNAL_URL
+              value: "https://<%= $puppetserver_fqdn %>:<%= $console_port %>"
+          resources:
+            requests:
+              cpu: "<%= $cpu_request %>"
+              memory: "<%= $memory_request %>"
+            limits:
+              cpu: "<%= $cpu_limit %>"
+              memory: "<%= $memory_limit %>"
+          volumeMounts:
+            - name: appliance-agent-socket
+              mountPath: /run/appliance/agent.sock
+      volumes:
+        - name: appliance-agent-socket
+          hostPath:
+            path: /run/appliance/agent.sock
+            type: Socket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stagehand-console
+  namespace: <%= $namespace %>
+  labels:
+    app.kubernetes.io/name: stagehand-console
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: stagehand-console
+  ports:
+    - name: https
+      port: <%= $console_port %>
+      targetPort: <%= $console_port %>
+---
+<%= epp('stagehand/console/k3s/networkpolicy.epp', {
+  'namespace'    => $namespace,
+  'service'      => 'console',
+  'console_port' => $console_port,
+}) -%>

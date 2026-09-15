@@ -10,8 +10,8 @@
 * [`stagehand::compilers`](#stagehand--compilers): Let every compile server encrypt for any agent (node_encrypt).
 * [`stagehand::console`](#stagehand--console): Install and run the Puppet Stagehand Console service itself.
 * [`stagehand::console::docker`](#stagehand--console--docker): Run the Puppet Stagehand Console as a digest-pinned Docker container.
-* [`stagehand::console::k3s`](#stagehand--console--k3s): Render the Console profile's Zot registry from Hiera into the
-k3s manifests directory, where k3s's own helm-controller reconciles it.
+* [`stagehand::console::k3s`](#stagehand--console--k3s): Render the Console profile (console, PostgreSQL, Zot) from
+Hiera into the k3s manifests directory for k3s to reconcile.
 * [`stagehand::console_integration`](#stagehand--console_integration): Wire a puppetserver primary to the Puppet Stagehand Console.
 * [`stagehand::platform_lock`](#stagehand--platform_lock): Converge one approved Puppet package release set for one or more VM roles.
 * [`stagehand::platform_lock::apt`](#stagehand--platform_lock--apt): Apply exact APT package versions, preferences, and native holds.
@@ -513,17 +513,20 @@ The manifests-directory-rendering sibling of `stagehand::console::docker`
 -- same repo, same `$ensure` parameter-naming convention, but a
 completely different delivery mechanism: this class declares NO
 `docker::image`/`docker::run` and NO hand-rolled `Exec` for the apply
-loop. It writes two `file` resources into `$manifests_dir` and stops --
+loop. It writes `file` resources into `$manifests_dir` and stops --
 k3s's own bundled helm-controller watches that directory for HelmChart
-and NetworkPolicy manifests and reconciles them on file change (D-05,
-RESEARCH.md Architecture Pattern 2). Applied via a real `bolt apply()` of
-a compiled catalog (D-05's agentless mechanism), never a persistent
-puppet-agent pull relationship against the appliance itself.
+manifests (and its manifest-deploy controller for plain manifests) and
+reconciles them on file change (D-05, RESEARCH.md Architecture
+Pattern 2). Applied via a real `bolt apply()` of a compiled catalog
+(D-05's agentless mechanism), never a persistent puppet-agent pull
+relationship against the appliance itself.
 
-Zot is this plan's tracer payload -- the simplest of the three
-console-profile services (no database, no secrets in its default
-configuration). PostgreSQL and the console itself are Plan 02's expansion
-out from this same pattern.
+Plan 01 proved this mechanism with Zot alone (no database, no secrets in
+its default configuration). Plan 02 expands it to the full Console
+profile: the console workload itself and PostgreSQL (CloudNativePG,
+chosen at Plan 02's blocking checkpoint), plus the first Kubernetes
+Secret this class renders -- the secret-handling path Zot's own
+configuration never exercised.
 
 ## Known, disclosed gap: k3s install/lifecycle is out of scope (D-05)
 Ignition bakes k3s into the appliance image at build time, so this class
@@ -536,23 +539,29 @@ for that escape hatch has not been confirmed yet -- a future phase should
 implement it deliberately, not have a reader assume it was forgotten.
 
 ## Known, disclosed gap: `ensure => 'absent'` does not retract applied resources
-Passing `ensure => 'absent'` stops this class from declaring either
-rendered `File` resource at all -- Puppet simply stops managing them
-going forward. Removing a file from the k3s manifests directory does NOT
-retract Kubernetes resources k3s already applied from it; k3s's
-apply-on-change mechanism has no observed retract-on-delete behavior.
-This mirrors `stagehand::console::docker`'s own disclosed
-`ensure => 'absent'` gap (RESEARCH.md Pitfall 3): an operator who wants
-the workload actually gone needs a separate deliberate removal step, not
-just this ensure flip.
+Passing `ensure => 'absent'` stops this class from declaring any of its
+five rendered `File` resources at all -- Puppet simply stops managing
+them going forward. Removing a file from the k3s manifests directory
+does NOT retract Kubernetes resources k3s already applied from it --
+including the `stagehand-console-secrets` Secret object itself, which
+stays live in the cluster even after this class stops rendering the file
+that originally created it. k3s's apply-on-change mechanism has no
+observed retract-on-delete behavior. This mirrors
+`stagehand::console::docker`'s own disclosed `ensure => 'absent'` gap
+(RESEARCH.md Pitfall 3): an operator who wants the workload (or the
+Secret) actually gone needs a separate deliberate removal step, not just
+this ensure flip.
 
 #### Examples
 
-##### Hiera-driven Zot render
+##### Hiera-driven Console-profile render
 
 ```puppet
 class { 'stagehand::console::k3s':
-  # sizing_tier supplied via Hiera: stagehand::console::k3s::sizing_tier
+  db_password       => Sensitive($facts['psh_db_password']),
+  ingest_token      => Sensitive($facts['psh_ingest_token']),
+  dataservice_token => Sensitive($facts['psh_dataservice_token']),
+  # sizing_tier, image_ref supplied via Hiera
 }
 ```
 
@@ -561,6 +570,10 @@ class { 'stagehand::console::k3s':
 The following parameters are available in the `stagehand::console::k3s` class:
 
 * [`sizing_tier`](#-stagehand--console--k3s--sizing_tier)
+* [`image_ref`](#-stagehand--console--k3s--image_ref)
+* [`db_password`](#-stagehand--console--k3s--db_password)
+* [`ingest_token`](#-stagehand--console--k3s--ingest_token)
+* [`dataservice_token`](#-stagehand--console--k3s--dataservice_token)
 * [`ensure`](#-stagehand--console--k3s--ensure)
 * [`manifests_dir`](#-stagehand--console--k3s--manifests_dir)
 * [`namespace`](#-stagehand--console--k3s--namespace)
@@ -568,6 +581,9 @@ The following parameters are available in the `stagehand::console::k3s` class:
 * [`zot_chart_version`](#-stagehand--console--k3s--zot_chart_version)
 * [`zot_app_version`](#-stagehand--console--k3s--zot_app_version)
 * [`manage_k3s`](#-stagehand--console--k3s--manage_k3s)
+* [`console_port`](#-stagehand--console--k3s--console_port)
+* [`puppetserver_fqdn`](#-stagehand--console--k3s--puppetserver_fqdn)
+* [`purge_data`](#-stagehand--console--k3s--purge_data)
 
 ##### <a name="-stagehand--console--k3s--sizing_tier"></a>`sizing_tier`
 
@@ -579,17 +595,65 @@ Hiera automatic parameter lookup
 (`stagehand::console::k3s::sizing_tier`), matching
 `stagehand::console::docker::image_ref`'s GitOps trigger model. An
 unknown tier name fails catalog compilation rather than silently
-rendering a wrong resource profile.
+rendering a wrong resource profile. Drives ALL THREE services'
+resource-request profiles from one selector in this class's body
+(`$sizing_profiles`) -- one tier value, never three independently
+drifting per-service tables.
+
+##### <a name="-stagehand--console--k3s--image_ref"></a>`image_ref`
+
+Data type: `Stagehand::Docker_image_ref`
+
+Fully-qualified, digest-pinned console image reference. Reuses
+`Stagehand::Docker_image_ref` verbatim -- the SAME type
+`stagehand::console::docker::image_ref` uses (RESEARCH.md Architecture
+Pattern 1, Don't Hand-Roll table row 2: one validated digest-pinning
+type for the whole project, never a second one for the k3s path). No
+compiled-in default -- Hiera-supplied
+(`stagehand::console::k3s::image_ref`). A tag-only or malformed
+reference fails catalog compilation before it ever reaches the
+rendered manifest.
+
+##### <a name="-stagehand--console--k3s--db_password"></a>`db_password`
+
+Data type: `Sensitive[String[1]]`
+
+The `psh` application-owner PostgreSQL password. Unwrapped exactly
+once, in this class's own `epp()` call for the Secret template's
+parameter hash -- never anywhere else, and never composed into a URL
+that lands in the console manifest (unlike
+`stagehand::console::docker`'s `$database_url`, which DOES embed the
+unwrapped password because it renders directly into a `docker::run`
+`env` array, not a file k3s applies). Here the password reaches the
+console container only via a `secretKeyRef`'d env var Kubernetes
+substitutes into `PSH_DATABASE_URL` at container start -- see
+`$database_url_template` below.
+
+##### <a name="-stagehand--console--k3s--ingest_token"></a>`ingest_token`
+
+Data type: `Sensitive[String[1]]`
+
+The console's ingest API token. Unwrapped exactly once, alongside
+`$db_password` and `$dataservice_token`, in the Secret template's
+parameter hash only.
+
+##### <a name="-stagehand--console--k3s--dataservice_token"></a>`dataservice_token`
+
+Data type: `Sensitive[String[1]]`
+
+The console's Data Service API token. Unwrapped exactly once,
+alongside `$db_password` and `$ingest_token`, in the Secret template's
+parameter hash only.
 
 ##### <a name="-stagehand--console--k3s--ensure"></a>`ensure`
 
 Data type: `Enum['present', 'absent']`
 
-'present' declares and renders the Zot manifest files; 'absent' stops
+'present' declares and renders all five manifest files; 'absent' stops
 this class from declaring them at all (see the disclosed gap above --
-this does NOT actively retract already-applied Kubernetes resources).
-Deliberately no 'latest' value here, matching `docker.pp`'s own
-digest/version-pinning divergence.
+this does NOT actively retract already-applied Kubernetes resources,
+including the Secret object). Deliberately no 'latest' value here,
+matching `docker.pp`'s own digest/version-pinning divergence.
 
 Default value: `'present'`
 
@@ -609,9 +673,8 @@ Default value: `'/var/lib/rancher/k3s/server/manifests'`
 
 Data type: `String[1]`
 
-Kubernetes namespace the rendered Zot workload and its NetworkPolicy
-target (`spec.targetNamespace` on the HelmChart CR, and the
-NetworkPolicy's own `metadata.namespace`).
+Kubernetes namespace the rendered console, PostgreSQL and Zot
+workloads and their NetworkPolicies target.
 
 Default value: `'stagehand'`
 
@@ -654,6 +717,38 @@ Defaults to `false` (k3s is baked in by Ignition -- nothing to
 install). Setting `true` fails catalog compilation with a message
 naming this deliberate omission rather than silently doing nothing --
 see the disclosed gap above.
+
+Default value: `false`
+
+##### <a name="-stagehand--console--k3s--console_port"></a>`console_port`
+
+Data type: `Integer[1, 65535]`
+
+TCP port the console binary listens on and its Service/NetworkPolicy
+expose. Matches `stagehand::console::docker::console_port`'s default.
+
+Default value: `8443`
+
+##### <a name="-stagehand--console--k3s--puppetserver_fqdn"></a>`puppetserver_fqdn`
+
+Data type: `String[1]`
+
+FQDN used to compose the console's `PSH_EXTERNAL_URL`. Matches
+`stagehand::console::docker::puppetserver_fqdn`'s default (the node's
+own `networking.fqdn` fact).
+
+Default value: `$facts['networking']['fqdn']`
+
+##### <a name="-stagehand--console--k3s--purge_data"></a>`purge_data`
+
+Data type: `Boolean`
+
+Reserved for future PVC-purge wiring, mirroring
+`stagehand::console::docker::purge_data`'s naming. This class does not
+yet declare any resource this parameter changes -- Kubernetes PVC
+lifecycle for the PostgreSQL/Zot volumes is left to the operator/chart
+defaults for now; accepted here so a future revision can wire it in
+without a breaking parameter-name change.
 
 Default value: `false`
 

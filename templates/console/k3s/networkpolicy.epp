@@ -1,9 +1,19 @@
 <%- | String[1] $namespace,
+      Enum['console', 'postgres', 'zot'] $service,
+      Integer[1, 65535] $console_port = 8443,
 | -%>
 # Managed by stagehand::console::k3s -- do not edit by hand.
-# Canonical content owned by stagehand-appliance/manifests/base/zot/networkpolicy.yaml
+# One parameterised NetworkPolicy template for all three Console-profile
+# services (console, PostgreSQL, Zot): default-deny ingress with exactly
+# one allow rule, per 999.22-RESEARCH.md's Security Domain table.
+# Canonical per-service content owned by
+# stagehand-appliance/manifests/base/{stagehand,postgresql,zot}/networkpolicy.yaml
 # (D-02); this template only interpolates Hiera-supplied values into that
-# same structure.
+# same structure. Called directly by k3s.pp for Zot's own file resource,
+# and via a nested epp() call from console-helmchart.epp/postgresql.epp
+# for the console and PostgreSQL policies -- one shared template body,
+# never three near-duplicate files.
+<% if $service == 'zot' { -%>
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,3 +33,44 @@ spec:
       ports:
         - protocol: TCP
           port: 5000
+<% } elsif $service == 'postgres' { -%>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stagehand-postgres-default-deny-ingress
+  namespace: <%= $namespace %>
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: stagehand-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: stagehand-console
+      ports:
+        - protocol: TCP
+          port: 5432
+<% } else { -%>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stagehand-console-default-deny-ingress
+  namespace: <%= $namespace %>
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: stagehand-console
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: <%= $namespace %>
+      ports:
+        - protocol: TCP
+          port: <%= $console_port %>
+<% } -%>
