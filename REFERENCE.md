@@ -41,13 +41,17 @@ Console deployment.
 * [`class_enumerate`](#class_enumerate): Read-only report of a node's currently-applied Puppet classes, read from the agent's local applied-classes state file — never a live catalog 
 * [`discover`](#discover): Read-only RAL enumeration of a node's current package/user/group/service (default) and mount/cron (opt-in) state via `puppet resource <type> 
 * [`ensure_ssh_server`](#ensure_ssh_server): Install and start an OpenSSH server on this host if not already present — idempotent, safe to run repeatedly. Detects the package manager (ap
+* [`inspector_scan`](#inspector_scan): Run a Puppet Inspector profile against a node and POST normalized compliance.v1 results to the console. Self-contained (bundles the inspector
 * [`install_ansible`](#install_ansible): Ensures ansible-playbook is present on the node per install_method (auto/package/pip/pipx/wsl/skip). Standalone task for direct/manual use; s
+* [`openscap_scan`](#openscap_scan): Evaluate a node with OpenSCAP (SCAP Security Guide) and POST normalized compliance.v1 results to the console. Self-contained (bundles the sca
 * [`patch`](#patch): Apply available OS package updates (all, or security-only) on a node, optionally reboot when required, then refresh the pcm_patch posture. Th
 * [`r10k_deploy`](#r10k_deploy): Deploy Puppet code for one environment via r10k — the console's on-demand poll (Core polls; PE deploys). Runs on the primary.
 * [`r10k_detect`](#r10k_detect): Read-only discovery of an existing r10k/Puppetfile configuration on the primary — reads r10k.yaml and every environment's Puppetfile content,
 * [`r10k_read_deploy_key`](#r10k_read_deploy_key): Reads an existing r10k/control-repo deploy key's PRIVATE key material off this host and returns it. SECURITY-SENSITIVE: only invoke on explic
 * [`recert`](#recert): Guarded re-certification: write csr_attributes.yaml (challenge + pp_* identity extension_requests), move the SSL dir aside (backup, never del
 * [`run_playbook`](#run_playbook): Runs a pasted Ansible playbook against the node itself via `ansible-playbook --connection=local -i localhost,` (Bolt pushes this task, no sep
+* [`scanner_lifecycle`](#scanner_lifecycle): Inspect, install, upgrade, or safely uninstall a Stagehand-managed Trivy/OpenSCAP scanner.
+* [`trivy_scan`](#trivy_scan): Scan a node's filesystem with Trivy and POST normalized compliance.v1 results to the console. Self-contained (bundles the trivy-report adapte
 
 ## Classes
 
@@ -1295,6 +1299,38 @@ Install and start an OpenSSH server on this host if not already present — idem
 
 **Supports noop?** false
 
+### <a name="inspector_scan"></a>`inspector_scan`
+
+Run a Puppet Inspector profile against a node and POST normalized compliance.v1 results to the console. Self-contained (bundles the inspector-report adapter). Does NOT install puppet-inspector -- it's pre-alpha with no published release channel yet, so the binary must already be present on the target (see https://github.com/souldo/puppet-inspector).
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `console_url`
+
+Data type: `String[1]`
+
+Console base URL to POST results to (server-injected).
+
+##### `ingest_token`
+
+Data type: `Optional[String[1]]`
+
+Bearer token for /api/v1/compliance/results (server-injected).
+
+##### `profile`
+
+Data type: `String[1]`
+
+Path to the Inspector profile YAML to run, already present on the target.
+
+##### `inspector_path`
+
+Data type: `String[1]`
+
+Path to the puppet-inspector binary on the target.
+
 ### <a name="install_ansible"></a>`install_ansible`
 
 Ensures ansible-playbook is present on the node per install_method (auto/package/pip/pipx/wsl/skip). Standalone task for direct/manual use; stagehand::run_playbook sources this script's install_ansible_run function so a chained install surfaces in the SAME run record rather than as a second Bolt invocation.
@@ -1308,6 +1344,44 @@ Ensures ansible-playbook is present on the node per install_method (auto/package
 Data type: `Enum[auto, package, pip, pipx, wsl, skip]`
 
 auto tries the node's package manager then falls back to pip; package/pip/pipx/wsl are dedicated single-strategy installs (no auto fallback between them); skip asserts ansible-playbook is already present.
+
+### <a name="openscap_scan"></a>`openscap_scan`
+
+Evaluate a node with OpenSCAP (SCAP Security Guide) and POST normalized compliance.v1 results to the console. Self-contained (bundles the scan-report adapter). Installs openscap-scanner + scap-security-guide when install=true.
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `console_url`
+
+Data type: `String[1]`
+
+Console base URL to POST results to (server-injected).
+
+##### `ingest_token`
+
+Data type: `Optional[String[1]]`
+
+Bearer token for /api/v1/compliance/results (server-injected).
+
+##### `profile`
+
+Data type: `String[1]`
+
+XCCDF profile id to evaluate.
+
+##### `datastream`
+
+Data type: `Optional[String[1]]`
+
+Path to the SCAP datastream. Defaults to the distro SSG content when unset.
+
+##### `install`
+
+Data type: `Boolean`
+
+Install openscap-scanner and scap-security-guide if missing.
 
 ### <a name="patch"></a>`patch`
 
@@ -1454,4 +1528,62 @@ Dry run (adds --check).
 Data type: `Enum[auto, package, pip, pipx, wsl, skip]`
 
 How to ensure Ansible is present before the play runs.
+
+### <a name="scanner_lifecycle"></a>`scanner_lifecycle`
+
+Inspect, install, upgrade, or safely uninstall a Stagehand-managed Trivy/OpenSCAP scanner.
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `scanner`
+
+Data type: `Enum[trivy, openscap]`
+
+Scanner component to manage.
+
+##### `action`
+
+Data type: `Enum[inspect, install, upgrade, uninstall]`
+
+Idempotent lifecycle action.
+
+##### `console_instance`
+
+Data type: `String[1]`
+
+Stable Stagehand console instance identifier written to the ownership marker.
+
+### <a name="trivy_scan"></a>`trivy_scan`
+
+Scan a node's filesystem with Trivy and POST normalized compliance.v1 results to the console. Self-contained (bundles the trivy-report adapter). Installs Trivy when install=true.
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `console_url`
+
+Data type: `String[1]`
+
+Console base URL to POST results to (server-injected).
+
+##### `ingest_token`
+
+Data type: `Optional[String[1]]`
+
+Bearer token for /api/v1/compliance/results (server-injected).
+
+##### `scan_path`
+
+Data type: `String[1]`
+
+Filesystem path to scan (trivy rootfs).
+
+##### `install`
+
+Data type: `Boolean`
+
+Install Trivy if it is not already present.
 
