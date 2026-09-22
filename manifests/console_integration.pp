@@ -39,6 +39,17 @@
 # @param manage_trusted_external    Manage the trusted-external command. Default true.
 # @param manage_hiera               Manage the environment hiera.yaml tier. Default true.
 # @param manage_autosign            Manage the policy-autosign hook. Default true.
+# @param hiera_uris
+#   Ordered Hiera tier `uris` list, console-owned (the console's
+#   `renderHieraHierarchy` is the single source of truth for tier order —
+#   see docs/design/module-architecture.md section 6). Typed-parameter
+#   delivery (the Phase 19 Plan 03 checkpoint decision): the caller (the
+#   installer, at plan-render time) passes the console-generated ordered
+#   uris; Puppet catalog compilation stays self-contained with no live
+#   console dependency. Default is today's 3 URIs, so an unparameterized
+#   apply is byte-identical to the previous hardcoded hiera.yaml. Minimum
+#   length 1 -- an empty list would leave the tier with no data source at
+#   all rather than falling back to a safe default.
 # @param manage_ssh_server
 #   Manage the OpenSSH server package by default on supported Debian- and
 #   RedHat-family primaries. Disable only when SSH is owned elsewhere.
@@ -65,6 +76,11 @@ class stagehand::console_integration (
   Boolean                      $manage_trusted_external = true,
   Boolean                      $manage_hiera           = true,
   Boolean                      $manage_autosign        = true,
+  Array[String[1], 1]          $hiera_uris             = [
+    'nodes/%{trusted.certname}',
+    'group/%{trusted.external.psh.primary_group}',
+    'common',
+  ],
   Boolean                      $manage_ssh_server      = true,
   String[1]                    $puppetserver_service   = 'puppetserver',
   Boolean                      $manage_service         = true,
@@ -221,6 +237,7 @@ class stagehand::console_integration (
       group   => $puppet_group,
       mode    => '0644',
       content => epp('stagehand/hiera.yaml.epp', {
+        'uris'        => $hiera_uris,
         'client_yaml' => $client_yaml,
       }),
       notify  => $svc_notify,

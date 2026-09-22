@@ -1,7 +1,12 @@
-<%- | String[1] $client_yaml | -%>
+<%- | Array[String[1]] $uris, String[1] $client_yaml | -%>
 # Managed by stagehand::console_integration — environment hiera.yaml.
 # The console Data Service tier sits ABOVE the on-disk tiers so console-served
 # data wins, falling back to yaml (and last-good cache) when unavailable.
+#
+# $uris is the ordered tier list the console owns (console's
+# renderHieraHierarchy is the single source of truth for tier order — see
+# docs/design/module-architecture.md); this template emits it verbatim and
+# does not re-append a trailing "common" itself.
 version: 5
 defaults:
   datadir: data
@@ -10,9 +15,9 @@ hierarchy:
   - name: "Console data (Data Service)"
     data_hash: stagehand::hiera_data
     uris:
-      - "nodes/%{trusted.certname}"
-      - "group/%{trusted.external.psh.primary_group}"
-      - "common"
+<% $uris.each |$uri| { -%>
+      - "<%= $uri %>"
+<% } -%>
     options:
       config: <%= $client_yaml %>
       on_error: use_cache
