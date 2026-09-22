@@ -46,12 +46,12 @@ process — read it before cutting a tag.
 
 ## Tasks (all self-contained; the console calls `stagehand::*` only)
 
-Compliance scanning (`trivy::trivy_scan`, `openscap::openscap_scan`) and
-patching (`patchbot::patch`) used to live here — they've moved to their own
-sibling modules (`trivy`, `openscap`, `patchbot`) so third parties can swap in
-their own scanner/patcher without depending on `stagehand` at all. See
-[Sibling first-party modules](../README.md) below and each module's own
-README for its task and, for the scanners, the `compliance.v1` schema.
+Compliance scanning, scanner lifecycle management, and patching all live
+directly in this module — there are no separate `trivy`/`openscap`/`patchbot`
+sibling modules to swap in. This repo is the one consolidated `stagehand`
+module (D-01–D-03, phase 999.12): a single pile of Bolt tasks (plus the
+console-provisioning manifests) versioned with the console, so the console
+dispatches every ops task it needs under one `stagehand::` namespace.
 
 - `stagehand::recert` — guarded re-certification (challenge + `ext_pp_*` identity
   extensions, `input_method: environment` so they pass through).
@@ -73,6 +73,40 @@ README for its task and, for the scanners, the `compliance.v1` schema.
   Puppet classes, read from the agent's local `classes.txt` state file. Never
   a live catalog compile, never a set-form Puppet Server call. Ruby (not sh)
   so it runs identically on Linux and Windows targets.
+- `stagehand::scanner_lifecycle` — inspect, install, upgrade, or safely
+  uninstall a Trivy or OpenSCAP scanner. A console-instance-scoped ownership
+  marker at `/var/lib/stagehand/scanners/<scanner>.json` is the sole removal
+  authority; a pre-existing external or unmanaged installation is never
+  claimed, overwritten, or removed.
+- `stagehand::trivy_scan` — scan a node's filesystem with Trivy, normalize
+  the result to `compliance.v1` with the bundled `files/trivy-report.sh`
+  adapter, and POST it to the console. Installs Trivy when `install=true`,
+  using a pinned release version with checksum verification
+  (FND-09 / CVE-2026-33634, GHSA-69fq-xp46-6x23).
+- `stagehand::openscap_scan` — evaluate a node with OpenSCAP (SCAP Security
+  Guide), normalize the result to `compliance.v1` with the bundled
+  `files/scan-report.sh` adapter, and POST it to the console. Installs
+  `openscap-scanner` + `scap-security-guide` via the distro-native package
+  manager when `install=true`.
+- `stagehand::inspector_scan` — run a Puppet Inspector profile against a
+  node, normalize the result to `compliance.v1` with the bundled
+  `files/inspector-report.sh` adapter, and POST it to the console.
+  **Accepted limit:** unlike `trivy_scan`/`openscap_scan`, this task does
+  **not** install `puppet-inspector`. The tool is pre-alpha with no
+  published release channel to pin a checksum against, so there is nothing
+  safe to pin an automated install to — adding an unpinned fetch-and-execute
+  install path here would be exactly the supply-chain hole this module's
+  own gate (`tools/supplychain/scan.sh`) exists to reject. The
+  `puppet-inspector` binary must already be present on the target (see the
+  `inspector_path` parameter, default `/usr/local/bin/puppet-inspector`)
+  before this task can run. Every other capability this module ships —
+  Patchbot, Trivy, OpenSCAP — installs and configures itself with no
+  target-side prerequisite; Inspector is the one console-dispatched
+  capability that stops short of that, by design, until `puppet-inspector`
+  ships a pinnable release.
+- `stagehand::patch` — Patchbot patch-application task (apply
+  all/security-only updates, optional reboot). See 999.12-01-SUMMARY.md for
+  its port history.
 
 ## Functions / facts / templates
 
@@ -94,7 +128,7 @@ match another one:
 | Param | On class | What it's for | Where it comes from |
 |---|---|---|---|
 | `db_password` | `stagehand::console` | Password for the console's own Postgres role/db (`psh`/`psh`). Purely local — nothing to do with puppetserver. | You invent it, e.g. `openssl rand -base64 32`. `stagehand::console` creates/syncs the Postgres role to match. |
-| `ingest_token` | `stagehand::console` | Doorkey for things **pushing data into** the console — the Bolt tasks in the sibling `trivy`, `openscap`, and `patchbot` modules (`trivy::trivy_scan`, `openscap::openscap_scan`, `patchbot::patch`) POST scan/patch results to the console's ingest API. Becomes `PSH_INGEST_TOKEN` (`templates/console.env.epp`). | You invent it, e.g. `openssl rand -hex 32`, and give the same value to whatever calls the ingest API. |
+| `ingest_token` | `stagehand::console` | Doorkey for things **pushing data into** the console — this module's own `stagehand::trivy_scan`, `stagehand::openscap_scan`, `stagehand::inspector_scan`, and `stagehand::patch` Bolt tasks POST scan/patch results to the console's ingest API. Becomes `PSH_INGEST_TOKEN` (`templates/console.env.epp`). | You invent it, e.g. `openssl rand -hex 32`, and give the same value to whatever calls the ingest API. |
 | `dataservice_token` | `stagehand::console` | Doorkey for things **pulling data out** — becomes `PSH_DATASERVICE_TOKEN` (`templates/console.env.epp`). | You invent it — **and it must equal `stagehand::console_integration`'s `token` param below.** |
 | `token` | `stagehand::console_integration` | The Bearer token puppetserver presents when it calls the console. `templates/psh-trusted-external.sh.epp` and `lib/puppet/functions/stagehand/hiera_data.rb` both send `Authorization: Bearer <token>`; `console.env.epp` only defines one inbound token for those two APIs (`PSH_DATASERVICE_TOKEN`) — so this has to be the **same string** as `dataservice_token`. | Same invented string as `dataservice_token`, reused. |
 | `console_binary_source` | `stagehand::console` | The compiled `puppet-console` binary, staged wherever the target can read it (local path or `puppet:///modules/...`) — `stagehand::console` just copies it into place. | **Not produced by this repo.** Comes from the separate `puppet_console` installer repo; stage it yourself (Bolt `upload_file`, artifact download, package, etc.) before applying `stagehand::console`. |
