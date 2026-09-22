@@ -42,6 +42,7 @@ Console deployment.
 * [`discover`](#discover): Read-only RAL enumeration of a node's current package/user/group/service (default) and mount/cron (opt-in) state via `puppet resource <type> 
 * [`ensure_ssh_server`](#ensure_ssh_server): Install and start an OpenSSH server on this host if not already present — idempotent, safe to run repeatedly. Detects the package manager (ap
 * [`install_ansible`](#install_ansible): Ensures ansible-playbook is present on the node per install_method (auto/package/pip/pipx/wsl/skip). Standalone task for direct/manual use; s
+* [`patch`](#patch): Apply available OS package updates (all, or security-only) on a node, optionally reboot when required, then refresh the pcm_patch posture. Th
 * [`r10k_deploy`](#r10k_deploy): Deploy Puppet code for one environment via r10k — the console's on-demand poll (Core polls; PE deploys). Runs on the primary.
 * [`r10k_detect`](#r10k_detect): Read-only discovery of an existing r10k/Puppetfile configuration on the primary — reads r10k.yaml and every environment's Puppetfile content,
 * [`r10k_read_deploy_key`](#r10k_read_deploy_key): Reads an existing r10k/control-repo deploy key's PRIVATE key material off this host and returns it. SECURITY-SENSITIVE: only invoke on explic
@@ -1307,6 +1308,38 @@ Ensures ansible-playbook is present on the node per install_method (auto/package
 Data type: `Enum[auto, package, pip, pipx, wsl, skip]`
 
 auto tries the node's package manager then falls back to pip; package/pip/pipx/wsl are dedicated single-strategy installs (no auto fallback between them); skip asserts ansible-playbook is already present.
+
+### <a name="patch"></a>`patch`
+
+Apply available OS package updates (all, or security-only) on a node, optionally reboot when required, then refresh the pcm_patch posture. The console reads the resulting posture via the pcm_patch fact on the next run.
+
+**Supports noop?** false
+
+#### Parameters
+
+##### `console_url`
+
+Data type: `Optional[String[1]]`
+
+Console base URL (server-injected; unused by the patch itself).
+
+##### `ingest_token`
+
+Data type: `Optional[String[1]]`
+
+Server-injected; unused by the patch itself.
+
+##### `security_only`
+
+Data type: `Boolean`
+
+Apply only security updates when true; otherwise apply all available updates.
+
+##### `reboot`
+
+Data type: `Boolean`
+
+Reboot the node afterward if a reboot is required.
 
 ### <a name="r10k_deploy"></a>`r10k_deploy`
 
