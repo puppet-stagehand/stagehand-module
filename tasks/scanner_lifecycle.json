@@ -1,0 +1,18 @@
+{
+  "description": "Inspect, install, upgrade, or safely uninstall a Stagehand-managed Trivy/OpenSCAP scanner.",
+  "input_method": "environment",
+  "parameters": {
+    "scanner": {
+      "description": "Scanner component to manage.",
+      "type": "Enum[trivy, openscap]"
+    },
+    "action": {
+      "description": "Idempotent lifecycle action.",
+      "type": "Enum[inspect, install, upgrade, uninstall]"
+    },
+    "console_instance": {
+      "description": "Stable Stagehand console instance identifier written to the ownership marker.",
+      "type": "String[1]"
+    }
+  }
+}

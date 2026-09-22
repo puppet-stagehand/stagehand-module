@@ -1,0 +1,29 @@
+{
+  "description": "Evaluate a node with OpenSCAP (SCAP Security Guide) and POST normalized compliance.v1 results to the console. Self-contained (bundles the scan-report adapter). Installs openscap-scanner + scap-security-guide when install=true.",
+  "input_method": "environment",
+  "files": ["stagehand/files/scan-report.sh"],
+  "parameters": {
+    "console_url": {
+      "description": "Console base URL to POST results to (server-injected).",
+      "type": "String[1]"
+    },
+    "ingest_token": {
+      "description": "Bearer token for /api/v1/compliance/results (server-injected).",
+      "type": "Optional[String[1]]"
+    },
+    "profile": {
+      "description": "XCCDF profile id to evaluate.",
+      "type": "String[1]",
+      "default": "xccdf_org.ssgproject.content_profile_standard"
+    },
+    "datastream": {
+      "description": "Path to the SCAP datastream. Defaults to the distro SSG content when unset.",
+      "type": "Optional[String[1]]"
+    },
+    "install": {
+      "description": "Install openscap-scanner and scap-security-guide if missing.",
+      "type": "Boolean",
+      "default": false
+    }
+  }
+}

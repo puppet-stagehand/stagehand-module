@@ -1,0 +1,24 @@
+{
+  "description": "Run a Puppet Inspector profile against a node and POST normalized compliance.v1 results to the console. Self-contained (bundles the inspector-report adapter). Does NOT install puppet-inspector -- it's pre-alpha with no published release channel yet, so the binary must already be present on the target (see https://github.com/souldo/puppet-inspector).",
+  "input_method": "environment",
+  "files": ["stagehand/files/inspector-report.sh"],
+  "parameters": {
+    "console_url": {
+      "description": "Console base URL to POST results to (server-injected).",
+      "type": "String[1]"
+    },
+    "ingest_token": {
+      "description": "Bearer token for /api/v1/compliance/results (server-injected).",
+      "type": "Optional[String[1]]"
+    },
+    "profile": {
+      "description": "Path to the Inspector profile YAML to run, already present on the target.",
+      "type": "String[1]"
+    },
+    "inspector_path": {
+      "description": "Path to the puppet-inspector binary on the target.",
+      "type": "String[1]",
+      "default": "/usr/local/bin/puppet-inspector"
+    }
+  }
+}
