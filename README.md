@@ -32,9 +32,19 @@ process — read it before cutting a tag.
 - **`stagehand::compilers`** — `include node_encrypt::certificates` so every compile
   server can encrypt for any agent (multi-primary). Absorbed from the retired
   `puppet_core::compilers`.
-- **`stagehand`** — inert anchor; `include stagehand` does nothing. Patch
-  posture (`patchbot`) and compliance scanning (`trivy`/`openscap`) live in
-  their own sibling modules — see [Sibling first-party modules](../README.md).
+- **`stagehand::console`**, **`stagehand::console::docker`**,
+  **`stagehand::console::k3s`** — install, configure, and run the console
+  binary itself (systemd unit, Docker container, or k3s deployment).
+- **`stagehand::patching`** — roll the `patchbot` external fact onto agents
+  so the console's Patching page has data (the pull path; no Bolt push
+  required). Opt-in via `stagehand`'s `manage_patching` parameter.
+- **`stagehand`** — anchor class; `include stagehand` manages nothing by
+  itself, but its `manage_patching` parameter (default `false`) applies
+  `stagehand::patching` when set. This is the one consolidated module
+  (999.12 D-01–D-03) for everything the console needs from Puppet — the
+  puppetserver-integration class, the console-provisioning manifests, and
+  every Bolt task the console dispatches all live here, versioned together.
+  There are no sibling `patchbot`/`trivy`/`openscap` modules.
 
 ## Functions
 

@@ -6,13 +6,14 @@
 
 ### Classes
 
-* [`stagehand`](#stagehand): Puppet Stagehand (stagehand) — anchor/documentation class.
+* [`stagehand`](#stagehand): Puppet Stagehand — anchor/documentation class.
 * [`stagehand::compilers`](#stagehand--compilers): Let every compile server encrypt for any agent (node_encrypt).
 * [`stagehand::console`](#stagehand--console): Install and run the Puppet Stagehand Console service itself.
 * [`stagehand::console::docker`](#stagehand--console--docker): Run the Puppet Stagehand Console as a digest-pinned Docker container.
 * [`stagehand::console::k3s`](#stagehand--console--k3s): Render the Console profile (console, PostgreSQL, Zot) from
 Hiera into the k3s manifests directory for k3s to reconcile.
 * [`stagehand::console_integration`](#stagehand--console_integration): Wire a puppetserver primary to the Puppet Stagehand Console.
+* [`stagehand::patching`](#stagehand--patching): Roll out the patchbot posture fact and keep its inputs fresh.
 * [`stagehand::platform_lock`](#stagehand--platform_lock): Converge one approved Puppet package release set for one or more VM roles.
 * [`stagehand::platform_lock::apt`](#stagehand--platform_lock--apt): Apply exact APT package versions, preferences, and native holds.
 * [`stagehand::platform_lock::manifest`](#stagehand--platform_lock--manifest): Atomically persist separate desired and observed lock snapshots.
@@ -57,30 +58,75 @@ Console deployment.
 
 ### <a name="stagehand"></a>`stagehand`
 
-`stagehand` itself manages nothing. It exists so a node can `include
-stagehand` as a stable entry point and so the module has a documented root.
-The class that does real work is `stagehand::console_integration` — wire a
-puppetserver primary to the console (ENC shim, trusted-external, Hiera Data
-Service, policy autosign). Primary only.
+This anchor class itself manages nothing by default. It exists so a node
+can `include stagehand` as a stable entry point and so the module has a
+documented root.
 
-The console-invoked Bolt tasks (stagehand::recert, stagehand::r10k_deploy)
-ship in tasks/ and need no classification — Bolt runs them directly.
+`stagehand` (this repo) is the one consolidated module for everything the
+Puppet Stagehand Console needs from Puppet — it is not split across
+sibling modules (999.12 D-01–D-03): the puppetserver-integration class,
+the console-provisioning manifests, and every Bolt task the console
+dispatches all live here, versioned together.
 
-Patch posture/patching (`patchbot`) and compliance scanning
-(`trivy`/`openscap`) live in their own sibling modules — they're optional,
-swappable add-ons, not part of the always-present puppetserver-integration
-surface this module owns. See each module's own README.
+  * stagehand::console_integration — wire a puppetserver primary to the
+                                     console (ENC shim, trusted-external,
+                                     Hiera Data Service, policy autosign).
+                                     Primary only.
+  * stagehand::console,
+    stagehand::console::docker,
+    stagehand::console::k3s          — install, configure, and run the
+                                     console binary itself (systemd unit,
+                                     Docker container, or k3s deployment).
+  * stagehand::patching             — roll the `patchbot` external fact
+                                     onto agents so the console's
+                                     Patching page has data (the PULL
+                                     path; no Bolt push required). Opt-in;
+                                     see the `manage_patching` param below.
+
+The console-invoked Bolt tasks ship in `tasks/` and need no
+classification — Bolt runs them directly: `stagehand::recert`,
+`stagehand::r10k_deploy`, `stagehand::run_playbook`,
+`stagehand::install_ansible`, `stagehand::class_enumerate`,
+`stagehand::scanner_lifecycle`, `stagehand::trivy_scan`,
+`stagehand::openscap_scan`, `stagehand::inspector_scan`, and
+`stagehand::patch` (the push complement to `stagehand::patching`'s pull
+path). None of them need an opt-in parameter here — Bolt dispatches them
+directly and they need no prior classification to run.
 
 #### Examples
+
+##### Roll the patch fact fleet-wide from a base profile
+
+```puppet
+class profile::base {
+  include stagehand::patching
+}
+```
 
 ##### Wire the primary (usually done by the installer, not a node group)
 
 ```puppet
 class { 'stagehand::console_integration':
   console_url => 'https://console.example.com',
-  token       => $facts['psh_service_token'],
+  token       => Sensitive('psh_...'),
 }
 ```
+
+#### Parameters
+
+The following parameters are available in the `stagehand` class:
+
+* [`manage_patching`](#-stagehand--manage_patching)
+
+##### <a name="-stagehand--manage_patching"></a>`manage_patching`
+
+Data type: `Boolean`
+
+When true, `include stagehand` also applies stagehand::patching (roll the
+fact to every classified node). Off by default so `include stagehand`
+stays inert.
+
+Default value: `false`
 
 ### <a name="stagehand--compilers"></a>`stagehand::compilers`
 
@@ -808,6 +854,7 @@ The following parameters are available in the `stagehand::console_integration` c
 * [`manage_trusted_external`](#-stagehand--console_integration--manage_trusted_external)
 * [`manage_hiera`](#-stagehand--console_integration--manage_hiera)
 * [`manage_autosign`](#-stagehand--console_integration--manage_autosign)
+* [`hiera_uris`](#-stagehand--console_integration--hiera_uris)
 * [`manage_ssh_server`](#-stagehand--console_integration--manage_ssh_server)
 * [`puppetserver_service`](#-stagehand--console_integration--puppetserver_service)
 * [`manage_service`](#-stagehand--console_integration--manage_service)
@@ -907,6 +954,31 @@ Manage the policy-autosign hook. Default true.
 
 Default value: `true`
 
+##### <a name="-stagehand--console_integration--hiera_uris"></a>`hiera_uris`
+
+Data type: `Array[String[1], 1]`
+
+Ordered Hiera tier `uris` list, console-owned (the console's
+`renderHieraHierarchy` is the single source of truth for tier order —
+see docs/design/module-architecture.md section 6). Typed-parameter
+delivery (the Phase 19 Plan 03 checkpoint decision): the caller (the
+installer, at plan-render time) passes the console-generated ordered
+uris; Puppet catalog compilation stays self-contained with no live
+console dependency. Default is today's 3 URIs, so an unparameterized
+apply is byte-identical to the previous hardcoded hiera.yaml. Minimum
+length 1 -- an empty list would leave the tier with no data source at
+all rather than falling back to a safe default.
+
+Default value:
+
+```puppet
+[
+    'nodes/%{trusted.certname}',
+    'group/%{trusted.external.psh.primary_group}',
+    'common',
+  ]
+```
+
 ##### <a name="-stagehand--console_integration--manage_ssh_server"></a>`manage_ssh_server`
 
 Data type: `Boolean`
@@ -931,6 +1003,101 @@ Data type: `Boolean`
 Whether to notify the puppetserver service on change. Default true.
 
 Default value: `true`
+
+### <a name="stagehand--patching"></a>`stagehand::patching`
+
+This is the **pull path** for patch posture: classify a node with
+`include stagehand::patching` and, on its next Puppet run, the `patchbot`
+external fact reaches the console via PuppetDB — the Patching page, the
+Action Center, and (behind the Labs `computed_findings` flag) the
+correlation engine read it with no Bolt push.
+The console's own PQL queries (backend/internal/httpapi/patching.go,
+dashboard.go, hipogamo.go) already query the fact by its `patchbot` name —
+see docs/design/patchbot-fact-rollout.md.
+
+The fact scripts themselves ship in the module's `facts.d/` and are
+delivered to agents by pluginsync. This class only guarantees the inputs
+those facts count against stay reasonably fresh.
+
+**Linux** (`patchbot.sh`) reads the package manager's metadata cache, so
+this class manages a small refresh timer. The fact is cheap and always
+current-ish.
+
+**Windows** (`patchbot.ps1`) is split in two, because a Windows Update
+Agent search reaches WSUS or Windows Update and routinely takes minutes —
+doing that inside a fact would stall every Puppet run on the box. So:
+
+  * the fact reads the registry (four-part OS build, reboot-pending) live,
+    in microseconds, and merges a cache off disk;
+  * `patchbot_refresh.ps1` does the slow WUA scan on a scheduled task and
+    writes that cache.
+
+A cold cache is not a failure. `os_build` still resolves, and the build
+number is the entire input to Windows vulnerability correlation — comparing
+it against MSRC's `FixedBuild` sidesteps the cumulative-update supersedence
+problem that produces thousands of false positives in KB-set matching. See
+docs/design/patch-fact-schema.md.
+
+The active `stagehand::patch` Bolt task (console "Patch" button) is the push
+complement; it does not need this class.
+
+Dependency-light on purpose: native systemd unit files on Linux and
+`schtasks.exe` on Windows rather than puppet/systemd and
+puppetlabs/scheduled_task, so the whole pack pins only puppetlabs/stdlib.
+
+#### Examples
+
+##### 
+
+```puppet
+include stagehand::patching
+```
+
+#### Parameters
+
+The following parameters are available in the `stagehand::patching` class:
+
+* [`manage_cache`](#-stagehand--patching--manage_cache)
+* [`cache_refresh`](#-stagehand--patching--cache_refresh)
+* [`manage_windows_scan`](#-stagehand--patching--manage_windows_scan)
+* [`windows_scan_hour`](#-stagehand--patching--windows_scan_hour)
+
+##### <a name="-stagehand--patching--manage_cache"></a>`manage_cache`
+
+Data type: `Boolean`
+
+Linux: keep the package manager's update metadata fresh (a small systemd
+timer) so the fact's counts are current. Default true.
+
+Default value: `true`
+
+##### <a name="-stagehand--patching--cache_refresh"></a>`cache_refresh`
+
+Data type: `String[1]`
+
+Linux: systemd OnCalendar expression for the refresh timer. Default 'daily'.
+
+Default value: `'daily'`
+
+##### <a name="-stagehand--patching--manage_windows_scan"></a>`manage_windows_scan`
+
+Data type: `Boolean`
+
+Windows: manage the scheduled task that refreshes the WUA cache.
+Default true.
+
+Default value: `true`
+
+##### <a name="-stagehand--patching--windows_scan_hour"></a>`windows_scan_hour`
+
+Data type: `Integer[0, 23]`
+
+Windows: hour (0-23) the daily WUA scan runs. The minute is derived
+per-node from fqdn_rand so a large fleet does not hit WSUS in one burst —
+the splay that patching_as_code omits and that turns a 4,000-node estate
+into a thundering herd. Default 3.
+
+Default value: `3`
 
 ### <a name="stagehand--platform_lock"></a>`stagehand::platform_lock`
 
